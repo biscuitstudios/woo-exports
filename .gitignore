@@ -20,3 +20,4 @@ docs/
 # built zip from the Releases page and copy its vendor/ across.
 vendor/
 .claude/
+.phpunit.result.cache

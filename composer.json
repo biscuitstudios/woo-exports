@@ -1,8 +1,8 @@
 {
     "name": "biscuit-studios/woo-exports",
-    "description": "Private WooCommerce reporting plugin for agency use",
+    "description": "Scheduled CSV and XLSX exports for WooCommerce",
     "type": "wordpress-plugin",
-    "license": "proprietary",
+    "license": "GPL-2.0-or-later",
     "require": {
         "php": ">=8.2",
         "phpoffice/phpspreadsheet": "^2.0"

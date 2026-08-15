@@ -30,15 +30,15 @@ jobs:
 
       - name: Lint every PHP file
         run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 -P4 php -l
-
-      # WITH dev dependencies here: the suite needs PHPUnit. The release
-      # workflow installs --no-dev, so PHPUnit never reaches a client site.
+      # WITH dev dependencies: the suite needs PHPUnit. The release workflow
+      # installs --no-dev, so PHPUnit never reaches a client site.
       - name: Install dependencies
         run: composer install --no-interaction --no-progress --prefer-dist
 
       - name: Run the test suite
         run: composer test
-standards:
+
+  standards:
     name: Coding standards
     runs-on: ubuntu-latest
     steps:
@@ -59,8 +59,8 @@ standards:
             phpcompatibility/phpcompatibility-wp:^2.1
           composer global config bin-dir --absolute -q >> "$GITHUB_PATH"
 
-      # BLOCKING. This ruleset finds real portability bugs: a function or syntax
-      # used that does not exist on the minimum PHP version the header claims.
+      # BLOCKING. Finds real portability bugs: syntax or functions that do not
+      # exist on the minimum PHP version the plugin header claims.
       - name: PHP version compatibility
         run: |
           phpcs -q --standard=PHPCompatibilityWP \
@@ -68,11 +68,10 @@ standards:
             --extensions=php --ignore=vendor/*,node_modules/* \
             --report=checkstyle . | cs2pr
 
-      # ADVISORY, deliberately. WordPress-Extra is a house style as much as a
-      # correctness check, and turning it on over an existing codebase produces
-      # hundreds of findings on day one. A red X on every push gets switched off
-      # and then nothing is checked. Findings show as PR annotations; tighten to
-      # blocking once the backlog is cleared.
+      # ADVISORY on purpose. WordPress-Extra is house style as much as
+      # correctness, and enabling it over an existing codebase produces hundreds
+      # of findings on day one. A red X on every push gets switched off, and then
+      # nothing is checked. Tighten to blocking once the backlog is cleared.
       - name: WordPress coding standards (advisory)
         continue-on-error: true
         run: |

@@ -1,15 +1,14 @@
 name: WordPress release watch
 
-# Answers the question "how do I know to re-test when WordPress ships a major?"
+# Answers "how do I know to re-test when WordPress ships a major?"
 #
-# Nothing else in CI can tell you this. Dependabot watches composer packages and
-# GitHub Actions; neither knows WordPress exists. So this job asks wordpress.org
-# once a week and opens an issue when core moves ahead of what this plugin
-# claims to be tested against.
+# Nothing else in CI can tell you. Dependabot watches composer packages and
+# GitHub Actions; neither knows WordPress exists. So this asks wordpress.org once
+# a week and opens an issue when core moves ahead of what the plugin claims.
 #
-# It deliberately ignores patch releases. WordPress minors are security and
-# bugfix only and essentially never break a plugin. Reacting to every one of
-# them is how a useful signal turns into noise you filter out.
+# It ignores patch releases on purpose. WordPress minors are security and bugfix
+# only and essentially never break a plugin. Reacting to each one turns a useful
+# signal into noise you learn to filter out.
 
 on:
   schedule:
@@ -39,15 +38,15 @@ jobs:
 
           echo "core=$LATEST  tested=$TESTED"
 
-          # Major.minor only. 7.0.4 and 7.0 are the same thing for our purposes.
+          # Major.minor only. 7.0.4 and 7.0 are the same thing here.
           maj () { printf '%s' "$1" | cut -d. -f1-2; }
 
           if [ "$(maj "$LATEST")" = "$(maj "$TESTED")" ]; then
             echo "stale=false" >> "$GITHUB_OUTPUT"
           else
-            echo "stale=true" >> "$GITHUB_OUTPUT"
-            echo "latest=$LATEST" >> "$GITHUB_OUTPUT"
-            echo "tested=$TESTED" >> "$GITHUB_OUTPUT"
+            echo "stale=true"       >> "$GITHUB_OUTPUT"
+            echo "latest=$LATEST"   >> "$GITHUB_OUTPUT"
+            echo "tested=$TESTED"   >> "$GITHUB_OUTPUT"
           fi
 
       - name: Open an issue, unless one is already open
@@ -66,18 +65,18 @@ jobs:
             exit 0
           fi
 
-          gh issue create --title "$TITLE" --label "maintenance" --body "$(cat <<EOF
-WordPress **$LATEST** is out. This plugin is marked \`Tested up to: $TESTED\`.
+          BODY="$RUNNER_TEMP/issue-body.md"
+          {
+            printf 'WordPress **%s** is out. This plugin is marked `Tested up to: %s`.\n\n' "$LATEST" "$TESTED"
+            printf 'CI cannot check this for you. The test suites run against hand-rolled\n'
+            printf 'stubs rather than a real WordPress install, so they keep passing even if\n'
+            printf 'core changes something this plugin depends on. This needs ten minutes by\n'
+            printf 'hand.\n\n'
+            printf -- '- [ ] Install %s on the Local dev site\n' "$LATEST"
+            printf -- '- [ ] Activate the plugin and exercise its main path\n'
+            printf -- '- [ ] Check the admin screen for PHP notices with `WP_DEBUG` on\n'
+            printf -- '- [ ] Bump `Tested up to:` in `readme.txt` and close this issue\n\n'
+            printf 'Opened automatically by `.github/workflows/wordpress-watch.yml`.\n'
+          } > "$BODY"
 
-CI cannot check this for you. The test suites run against hand-rolled stubs
-rather than a real WordPress install, so they will keep passing even if core
-changes something this plugin depends on. This needs ten minutes by hand.
-
-- [ ] Install $LATEST on the Local dev site
-- [ ] Activate the plugin and exercise its main path
-- [ ] Check the admin screen for PHP notices with \`WP_DEBUG\` on
-- [ ] Bump \`Tested up to:\` in \`readme.txt\` and close this issue
-
-Opened automatically by \`.github/workflows/wordpress-watch.yml\`.
-EOF
-)"
+          gh issue create --title "$TITLE" --body-file "$BODY"

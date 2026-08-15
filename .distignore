@@ -1,0 +1,22 @@
+# Excluded from the deploy artifact. vendor/ is intentionally NOT listed: it is
+# a runtime dependency (PhpSpreadsheet) and must ship inside the zip.
+#
+# It is no longer committed to git. CI runs `composer install --no-dev` before
+# building, so vendor/ exists at build time and lands in the artifact exactly as
+# it always did. Building by hand needs that composer step first.
+/.distignore
+/.gitignore
+/.git
+.DS_Store
+/docs
+/CLAUDE.md
+/tests
+/composer.json
+/composer.lock
+/phpunit.xml.dist
+/bin
+/node_modules
+/.github
+/README.md
+/SECURITY.md
+/.claude

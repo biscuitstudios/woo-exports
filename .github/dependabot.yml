@@ -1,0 +1,15 @@
+version: 2
+
+# Version updates. The SECURITY alerts that matter most are a repository
+# setting, not this file: Settings > Code security > Dependabot alerts.
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+
+  - package-ecosystem: "composer"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5

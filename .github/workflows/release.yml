@@ -1,0 +1,50 @@
+name: Release
+
+# Tag a commit to ship it:
+#   git tag v1.2.3 && git push origin v1.2.3
+#
+# The tag must match the version in the plugin header. build.sh already refuses
+# to run when the header and the VERSION constant disagree, so the three stay
+# locked together.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      # --no-dev is not optional. build.sh ships vendor/ inside the zip, so a
+      # plain `composer install` here would put PHPUnit on every client site.
+      - name: Install runtime dependencies
+        run: composer install --no-dev --optimize-autoloader --no-interaction --no-progress
+
+      # build.sh zips the checkout directory by its own folder name, so the
+      # REPOSITORY NAME MUST MATCH THE PLUGIN FOLDER SLUG. A repo named
+      # anything else produces a zip that installs to the wrong directory.
+      - name: Check the repo name matches the plugin slug
+        run: |
+          if [ "${{ github.event.repository.name }}" != "woo-exports" ]; then
+            echo "Repo is named '${{ github.event.repository.name }}' but this plugin's slug is 'woo-exports'." >&2
+            echo "Rename the repository, or the built zip will install to the wrong folder." >&2
+            exit 1
+          fi
+
+      - name: Build the plugin zip
+        run: bash bin/build.sh "$RUNNER_TEMP"
+
+      - name: Publish the release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ runner.temp }}/*.zip
+          generate_release_notes: true

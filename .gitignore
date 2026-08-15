@@ -1,0 +1,22 @@
+.DS_Store
+CLAUDE.md
+docs/
+
+# vendor/ is no longer committed, as of the move to a public GitHub repo.
+#
+# It used to be, deliberately, so the plugin could deploy without a composer
+# install. That reasoning was sound while the repo was private on Bitbucket. It
+# stops being sound in a public repo: it publishes a vendored copy of
+# PhpSpreadsheet and its dependencies, ~675 files, and pins the studio to
+# whatever versions happened to be on Jason's Mac.
+#
+# What replaces it: .github/workflows/release.yml runs `composer install
+# --no-dev` and builds the zip, so the RELEASE still contains vendor/ exactly as
+# before. Nothing changes for the sites receiving it.
+#
+# The catch, and it matters because there is no composer on the studio Mac: a
+# fresh clone of this repo will have no vendor/, and the plugin will fatal until
+# one exists. Either install composer locally (see docs/DEPLOY.md) or download a
+# built zip from the Releases page and copy its vendor/ across.
+vendor/
+.claude/

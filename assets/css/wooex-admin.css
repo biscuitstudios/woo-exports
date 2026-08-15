@@ -1,0 +1,810 @@
+/* Woo Agency Reports — admin styles
+ * Visual language mirrors WooCommerce Analytics: white cards on the WP admin
+ * #f0f0f1 background, hairline 1px shadow-borders, 24px internal padding,
+ * #1e1e1e for emphasized text, #e2e4e7 for dividers, #f0f0f0 for table headers.
+ *
+ * Tokens are inlined rather than relying on WC's `.woocommerce-*` stylesheet so
+ * the look does not depend on which WooCommerce admin assets are enqueued.
+ */
+
+.wooex-reports-page,
+.wooex-report-builder {
+	color: #3c434a;
+	font-size: 13px;
+	line-height: 1.4;
+	/* Form-control height — 44px is the iOS HIG minimum touch target and
+	   sits comfortably under a mouse, so we apply the same height across
+	   desktop, tablet, and mobile rather than branching on viewport. */
+	--wooex-input-height: 44px;
+}
+
+/* ============================================================
+   Toast notifications — fixed bottom-left, aligned to #wpcontent.
+   JS sets the actual `left` on init/resize/menu-fold; this is the
+   pre-JS fallback assuming a standard 160px expanded sidebar.
+   ============================================================ */
+
+.wooex-notice-area {
+	position: fixed;
+	bottom: 24px;
+	left: 180px;
+	z-index: 100050;
+	width: 360px;
+	max-width: calc(100vw - 48px);
+	pointer-events: none;
+}
+.wooex-notice-area .notice {
+	pointer-events: auto;
+	margin: 0 0 10px 0;
+	padding: 14px 36px 14px 16px;
+	background: #fff;
+	border: 0;
+	border-left: 4px solid transparent;
+	border-radius: 4px;
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.1),
+		0 6px 16px rgba(0, 0, 0, 0.12);
+	color: #1e1e1e;
+	font-size: 13px;
+	position: relative;
+	animation: warToastIn 0.2s ease-out;
+}
+.wooex-notice-area .notice p {
+	margin: 0;
+}
+.wooex-notice-area .notice-success {
+	border-left-color: #1e8a3e;
+}
+.wooex-notice-area .notice-error {
+	border-left-color: #d63638;
+}
+@keyframes warToastIn {
+	from { opacity: 0; transform: translateY(8px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+   List page — WC Analytics-style table
+   ============================================================ */
+
+.wooex-reports-list .wp-heading-inline {
+	font-size: 23px;
+	font-weight: 400;
+	color: #1e1e1e;
+	margin: 0;
+	padding: 9px 0 4px 0;
+	line-height: 1.3;
+}
+.wooex-reports-list .page-title-action {
+	margin-left: 12px;
+}
+
+/* Card surface around the entire table block — matches .wooex-card */
+.wooex-table-card {
+	background: #fff;
+	border-radius: 4px;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+	margin: 16px 0 24px;
+}
+
+/* ---- Card header: view tabs + search -------------------------------------- */
+.wooex-table-card-header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+	padding: 16px 24px;
+	border-bottom: 1px solid #e2e4e7;
+	flex-wrap: wrap;
+}
+.wooex-table-views {
+	display: flex;
+	gap: 0;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	align-items: center;
+}
+.wooex-table-views li {
+	margin: 0;
+}
+.wooex-table-views a {
+	display: block;
+	padding: 8px 14px;
+	font-size: 13px;
+	color: #50575e;
+	text-decoration: none;
+	border-radius: 4px;
+	font-weight: 500;
+}
+.wooex-table-views a:hover {
+	color: #1e1e1e;
+	background: #f0f0f0;
+}
+.wooex-table-views a.is-current {
+	color: #1e1e1e;
+	font-weight: 600;
+}
+.wooex-table-views-count {
+	color: #757575;
+	font-weight: 400;
+	margin-left: 2px;
+}
+
+.wooex-table-search {
+	display: flex;
+	gap: 6px;
+	align-items: center;
+}
+.wooex-table-search input[type="search"] {
+	box-sizing: border-box;
+	height: var(--wooex-input-height);
+	padding: 0 12px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	font-size: 13px;
+	line-height: 1.4;
+	min-width: 240px;
+}
+.wooex-table-search input[type="search"]:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: 2px solid transparent;
+}
+
+/* ---- Toolbar: bulk actions, type filter, item count ---------------------- */
+.wooex-table-toolbar {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 24px;
+	border-bottom: 1px solid #e2e4e7;
+	flex-wrap: wrap;
+}
+.wooex-table-toolbar-section {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex-wrap: wrap;
+}
+.wooex-table-toolbar select {
+	box-sizing: border-box;
+	height: var(--wooex-input-height);
+	padding: 0 32px 0 12px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	font-size: 13px;
+	line-height: 1.4;
+	background-color: #fff;
+}
+.wooex-table-count {
+	font-size: 13px;
+	color: #50575e;
+}
+
+/* ---- The actual table ---------------------------------------------------- */
+.wooex-table-scroller {
+	overflow-x: auto;
+	width: 100%;
+}
+.wooex-table {
+	width: 100%;
+	border-collapse: collapse;
+	table-layout: auto;
+	font-size: 13px;
+	color: #3c434a;
+}
+.wooex-table .wooex-table-row {
+	border: 0;
+}
+.wooex-table .wooex-table-row + .wooex-table-row .wooex-table-cell {
+	border-top: 1px solid #e2e4e7;
+}
+.wooex-table-row-header .wooex-table-header {
+	background: #f0f0f0;
+	color: #1e1e1e;
+	font-weight: 700;
+	font-size: 13px;
+	line-height: 1.4;
+	padding: 14px 16px;
+	border-bottom: 1px solid #e2e4e7;
+	white-space: nowrap;
+	vertical-align: middle;
+}
+.wooex-table-row-header .wooex-table-header:first-child {
+	padding-left: 24px;
+}
+.wooex-table-row-header .wooex-table-header:last-child {
+	padding-right: 24px;
+}
+.wooex-table-cell {
+	padding: 16px;
+	vertical-align: middle;
+	background: #fff;
+	color: #3c434a;
+	font-size: 13px;
+	line-height: 1.5;
+	font-weight: 400;
+}
+.wooex-table-cell:first-child { padding-left: 24px; }
+.wooex-table-cell:last-child  { padding-right: 24px; }
+
+/* Sort affordance */
+.wooex-table-sort {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	color: inherit;
+	text-decoration: none;
+	font-weight: 700;
+}
+.wooex-table-sort:hover {
+	color: #2271b1;
+}
+.wooex-sort-indicator {
+	font-size: 10px;
+	color: #1e1e1e;
+}
+.wooex-sort-indicator-idle {
+	color: #c3c4c7;
+}
+
+/* Alignment helpers */
+.is-left-aligned   { text-align: left; }
+.is-center-aligned { text-align: center; }
+.is-right-aligned  { text-align: right; }
+
+/* Specific columns */
+.wooex-col-cb {
+	width: 36px;
+}
+.wooex-col-cb input[type="checkbox"] {
+	margin: 0;
+	vertical-align: middle;
+}
+.wooex-col-actions {
+	width: 56px;
+}
+.wooex-col-name {
+	font-weight: 600;
+	color: #1e1e1e;
+	min-width: 200px;
+}
+.wooex-row-title {
+	color: #1e1e1e;
+	font-weight: 600;
+	text-decoration: none;
+}
+.wooex-row-title:hover {
+	color: #2271b1;
+}
+
+.wooex-muted {
+	color: #757575;
+	font-style: normal;
+}
+
+.wooex-table-empty .wooex-table-cell {
+	text-align: center;
+	padding: 32px 16px;
+	color: #757575;
+}
+
+.wooex-status-success { color: #1e8a3e; font-weight: 600; font-size: 12px; }
+.wooex-status-failed  { color: #b32d2e; font-weight: 600; font-size: 12px; }
+.wooex-status-late    { color: #b26200; font-weight: 600; font-size: 12px; }
+
+/* ---- Footer: count + pagination ------------------------------------------ */
+.wooex-table-footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 12px;
+	padding: 12px 24px;
+	border-top: 1px solid #e2e4e7;
+}
+.wooex-table-pagination {
+	display: flex;
+	gap: 4px;
+	align-items: center;
+}
+.wooex-pagination-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 32px;
+	height: 32px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	color: #3c434a;
+	text-decoration: none;
+	font-size: 16px;
+	line-height: 1;
+	background: #fff;
+}
+.wooex-pagination-btn:hover {
+	background: #f0f0f0;
+	border-color: #8c8f94;
+}
+.wooex-pagination-btn.is-disabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+.wooex-pagination-status {
+	font-size: 13px;
+	color: #50575e;
+	margin: 0 8px;
+}
+
+/* ---- Horizontal scroll breakpoint --------------------------------------- */
+/* At narrow viewports the table content can't fit alongside the WP sidebar.
+   Hint min-widths so the table forces horizontal scroll inside its wrapper
+   instead of wrapping each cell. */
+@media screen and (max-width: 1400px) {
+	.wooex-table {
+		min-width: 1100px;
+	}
+}
+
+/* Row-actions meatball menu */
+.wooex-rowmenu {
+	position: relative;
+	display: inline-block;
+}
+.wooex-rowmenu-toggle {
+	background: transparent;
+	border: 1px solid transparent;
+	border-radius: 4px;
+	color: #50575e;
+	cursor: pointer;
+	font-size: 20px;
+	line-height: 1;
+	padding: 4px 8px;
+	width: 32px;
+	height: 32px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+}
+.wooex-rowmenu-toggle:hover,
+.wooex-rowmenu-toggle:focus,
+.wooex-rowmenu[aria-expanded="true"] .wooex-rowmenu-toggle {
+	background: #f0f0f0;
+	color: #1e1e1e;
+	outline: none;
+}
+.wooex-rowmenu-toggle:focus-visible {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+}
+.wooex-rowmenu-list {
+	/* Fixed positioning escapes the table's overflow-x:auto clipping. JS sets
+	   the actual top/right via getBoundingClientRect when the menu opens. */
+	position: fixed;
+	top: 0;
+	right: 0;
+	min-width: 180px;
+	margin: 0;
+	padding: 4px 0;
+	background: #fff;
+	border-radius: 4px;
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.1),
+		0 6px 16px rgba(0, 0, 0, 0.12);
+	list-style: none;
+	text-align: left;
+	z-index: 100040;
+	animation: warRowMenuIn 0.12s ease-out;
+}
+.wooex-rowmenu-list[hidden] {
+	display: none;
+}
+.wooex-rowmenu-list li {
+	margin: 0;
+}
+.wooex-rowmenu-list a {
+	display: block;
+	padding: 8px 14px;
+	color: #1e1e1e;
+	text-decoration: none;
+	font-size: 13px;
+	line-height: 1.4;
+}
+.wooex-rowmenu-list a:hover,
+.wooex-rowmenu-list a:focus {
+	background: #f0f0f0;
+	color: #1e1e1e;
+	outline: none;
+}
+.wooex-rowmenu-list a.submitdelete {
+	color: #b32d2e;
+}
+.wooex-rowmenu-list a.submitdelete:hover {
+	background: #fcf0f1;
+	color: #b32d2e;
+}
+.wooex-rowmenu-divider {
+	height: 1px;
+	margin: 4px 0;
+	background: #e2e4e7;
+}
+@keyframes warRowMenuIn {
+	from { opacity: 0; transform: translateY(-4px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Bulk-actions / filter bars above + below the table */
+.wooex-reports-list .tablenav {
+	margin: 8px 0;
+}
+.wooex-reports-list .tablenav .actions {
+	padding: 0;
+}
+.wooex-reports-list .subsubsub {
+	margin: 8px 0 12px;
+	font-size: 13px;
+}
+
+/* Toggle switch — used in the Active column */
+.wooex-switch {
+	position: relative;
+	display: inline-block;
+	width: 38px;
+	height: 22px;
+	vertical-align: middle;
+}
+.wooex-switch input {
+	opacity: 0;
+	width: 0;
+	height: 0;
+}
+.wooex-switch-slider {
+	position: absolute;
+	cursor: pointer;
+	top: 0; left: 0; right: 0; bottom: 0;
+	background-color: #c3c4c7;
+	transition: 0.2s;
+	border-radius: 22px;
+}
+.wooex-switch-slider:before {
+	position: absolute;
+	content: "";
+	height: 16px; width: 16px;
+	left: 3px;
+	bottom: 3px;
+	background-color: #fff;
+	transition: 0.2s;
+	border-radius: 50%;
+}
+.wooex-switch input:checked + .wooex-switch-slider {
+	background-color: #1e8a3e;
+}
+.wooex-switch input:checked + .wooex-switch-slider:before {
+	transform: translateX(16px);
+}
+
+/* ============================================================
+   Builder page
+   ============================================================ */
+
+.wooex-report-builder {
+	max-width: 1080px;
+}
+
+/* Sticky header — generous padding, white card surface, hairline edge.
+   Sits under WP's admin bar (32px desktop, 46px mobile). */
+.wooex-builder-header {
+	position: sticky;
+	top: 32px;
+	z-index: 100;
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 16px;
+	margin: 0 0 24px;
+	padding: 20px 24px;
+	background: #fff;
+	border-radius: 4px;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+@media screen and (max-width: 782px) {
+	.wooex-builder-header {
+		top: 46px;
+		padding: 16px 20px;
+	}
+}
+.wooex-builder-header h1 {
+	margin: 0;
+	padding: 0;
+	font-size: 16px;
+	font-weight: 600;
+	color: #1e1e1e;
+	line-height: 1.4;
+}
+.wooex-builder-header-actions {
+	display: flex;
+	gap: 8px;
+	align-items: center;
+}
+
+/* Card sections */
+.wooex-card {
+	background: #fff;
+	border: 0;
+	border-radius: 4px;
+	margin: 0 0 24px;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+.wooex-card-header {
+	padding: 16px 24px;
+	background: transparent;
+	border-bottom: 1px solid #e2e4e7;
+	border-radius: 4px 4px 0 0;
+}
+.wooex-card-header h2 {
+	margin: 0;
+	font-size: 14px;
+	font-weight: 600;
+	color: #1e1e1e;
+	line-height: 1.4;
+}
+.wooex-card-body {
+	padding: 24px;
+}
+
+/* Form fields */
+.wooex-field {
+	margin-bottom: 20px;
+}
+.wooex-field:last-child {
+	margin-bottom: 0;
+}
+.wooex-field > label,
+.wooex-field-label {
+	display: block;
+	font-size: 13px;
+	font-weight: 500;
+	color: #1e1e1e;
+	margin-bottom: 8px;
+	line-height: 1.4;
+}
+.wooex-field input[type="text"],
+.wooex-field input[type="time"],
+.wooex-field input[type="date"],
+.wooex-field input[type="number"],
+.wooex-field input[type="email"],
+.wooex-field input[type="search"],
+.wooex-field input[type="url"],
+.wooex-field select:not([multiple]) {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 100%;
+	height: var(--wooex-input-height);
+	padding: 0 12px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	background: #fff;
+	color: #1e1e1e;
+	font-size: 13px;
+	line-height: 1.4;
+	box-shadow: none;
+}
+.wooex-field textarea {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 100%;
+	min-height: var(--wooex-input-height);
+	padding: 12px;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	background: #fff;
+	color: #1e1e1e;
+	font-size: 13px;
+	line-height: 1.4;
+	box-shadow: none;
+}
+.wooex-field input[type="text"]:focus,
+.wooex-field input[type="time"]:focus,
+.wooex-field input[type="date"]:focus,
+.wooex-field input[type="number"]:focus,
+.wooex-field input[type="email"]:focus,
+.wooex-field input[type="search"]:focus,
+.wooex-field input[type="url"]:focus,
+.wooex-field select:not([multiple]):focus,
+.wooex-field textarea:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: 2px solid transparent;
+}
+.wooex-field input[type="number"] {
+	max-width: 120px;
+}
+.wooex-field input[type="time"] {
+	max-width: 180px;
+}
+.wooex-field textarea {
+	font-family: ui-monospace, Menlo, Consolas, monospace;
+	min-height: 80px;
+}
+.wooex-field .description {
+	margin-top: 8px;
+	color: #757575;
+	font-size: 12px;
+	line-height: 1.5;
+}
+
+.wooex-field-row {
+	display: flex;
+	flex-direction: row;
+	flex-wrap: wrap;
+	align-items: flex-start;
+	gap: 20px;
+}
+.wooex-field-row > .wooex-field {
+	flex: 1 1 0;
+	min-width: 220px;
+	margin-bottom: 20px;
+}
+
+.wooex-required {
+	color: #b32d2e;
+	margin-left: 2px;
+}
+
+.wooex-form-error {
+	margin: 16px 0 0;
+}
+
+/* SelectWoo / Select2 — give the rendered selection box the same chrome as
+   native inputs so it doesn't look like a different control. */
+.wooex-card .select2-container--default .select2-selection--multiple,
+.wooex-card .select2-container--default .select2-selection--single {
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	min-height: var(--wooex-input-height);
+}
+.wooex-card .select2-container--default.select2-container--focus .select2-selection--multiple,
+.wooex-card .select2-container--default.select2-container--focus .select2-selection--single {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+}
+/* Vertically center the single-select rendered text + caret within the 44px container. */
+.wooex-card .select2-container--default .select2-selection--single .select2-selection__rendered {
+	line-height: calc(var(--wooex-input-height) - 2px);
+	padding-left: 12px;
+	padding-right: 32px;
+}
+.wooex-card .select2-container--default .select2-selection--single .select2-selection__arrow {
+	height: calc(var(--wooex-input-height) - 2px);
+	right: 6px;
+}
+/* Multi-select: pad the container so pills vertically center; pills themselves
+   stay their natural size and wrap as the user adds more selections. */
+.wooex-card .select2-container--default .select2-selection--multiple {
+	padding: 4px 8px;
+}
+.wooex-card .select2-container--default .select2-selection--multiple .select2-selection__rendered {
+	padding: 0;
+	display: flex;
+	flex-wrap: wrap;
+	min-height: calc(var(--wooex-input-height) - 10px);
+	align-items: center;
+}
+/* SelectWoo defaults push the pill <li>s down with margin-top: 5px, which
+   throws off the flex `align-items: center`. Zero out those margins so the
+   pills (and the clear-all "×") vertically center inside the 44px container. */
+.wooex-card .select2-container--default .select2-selection--multiple .select2-selection__rendered li {
+	margin: 0 5px 0 0;
+}
+.wooex-card .select2-container--default .select2-selection--multiple .select2-selection__clear {
+	margin-top: 0;
+}
+.wooex-card .select2-container--default .select2-selection--multiple .select2-search--inline .select2-search__field {
+	margin-top: 0;
+	height: calc(var(--wooex-input-height) - 14px);
+	line-height: 1.4;
+}
+
+/* Inline date range: select + custom From/To pickers all on one line */
+.wooex-date-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 10px;
+	align-items: center;
+}
+.wooex-date-row > select {
+	width: auto !important;
+	min-width: 260px;
+	flex: 0 0 auto;
+}
+.wooex-date-row .wooex-custom-dates {
+	display: inline-flex;
+	gap: 12px;
+	align-items: center;
+}
+.wooex-date-row .wooex-custom-dates label {
+	display: inline-flex;
+	gap: 6px;
+	align-items: center;
+	margin: 0;
+	font-weight: 400;
+	color: #3c434a;
+}
+.wooex-date-row .wooex-custom-dates input[type="date"] {
+	width: auto;
+}
+
+/* Disabled (gated) section */
+.wooex-disabled {
+	opacity: 0.5;
+	pointer-events: none;
+}
+.wooex-disabled .select2-container {
+	pointer-events: none;
+}
+
+/* Weekly days-of-week checkbox grid */
+.wooex-days-grid {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px 18px;
+	margin-top: 4px;
+}
+.wooex-day-check {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-weight: 400;
+	color: #3c434a;
+	margin: 0;
+}
+
+/* Review / Preview area inside Filters card */
+.wooex-review-area {
+	margin-top: 24px;
+	padding-top: 20px;
+	border-top: 1px solid #e2e4e7;
+}
+.wooex-review-area .wooex-preview-download-btn {
+	margin-left: 6px;
+}
+.wooex-review-results {
+	margin-top: 16px;
+}
+.wooex-review-table-wrap {
+	overflow-x: auto;
+	background: #fff;
+	border-radius: 4px;
+	box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+	margin-top: 12px;
+}
+.wooex-review-table-wrap table {
+	margin: 0;
+	width: 100%;
+	border-collapse: collapse;
+}
+.wooex-review-table-wrap th,
+.wooex-review-table-wrap td {
+	padding: 12px 16px;
+	border-bottom: 1px solid #e2e4e7;
+	font-size: 13px;
+	line-height: 1.4;
+	text-align: left;
+}
+.wooex-review-table-wrap th {
+	background: #f0f0f0;
+	color: #1e1e1e;
+	font-weight: 700;
+	white-space: nowrap;
+}
+.wooex-review-table-wrap td {
+	color: #3c434a;
+	white-space: nowrap;
+	max-width: 320px;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.wooex-review-table-wrap tbody tr:last-child td {
+	border-bottom: 0;
+}

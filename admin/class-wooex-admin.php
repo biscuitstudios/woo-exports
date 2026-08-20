@@ -809,16 +809,19 @@ class Wooex_Admin {
 	}
 
 	/**
-	 * Validate an HH:MM wall-clock time, falling back to $default.
+	 * Validate an HH:MM wall-clock time, falling back to $fallback.
 	 *
 	 * Shared by the filter's `day_start` and the schedule's `time` against
 	 * Wooex_Data_Orders::TIME_PATTERN, so the two cannot drift on what they
 	 * accept. resolve_dates() re-validates with the same pattern, because saved
 	 * options can also be written by code that never passed through here.
+	 *
+	 * The parameter is `$fallback` rather than the more obvious `$default`
+	 * because `default` is a reserved keyword, which WordPress-Extra flags.
 	 */
-	private function sanitize_time_hhmm( $raw, string $default ): string {
+	private function sanitize_time_hhmm( $raw, string $fallback ): string {
 		$value = sanitize_text_field( is_scalar( $raw ) ? (string) $raw : '' );
-		return preg_match( Wooex_Data_Orders::TIME_PATTERN, $value ) ? $value : $default;
+		return preg_match( Wooex_Data_Orders::TIME_PATTERN, $value ) ? $value : $fallback;
 	}
 
 	private function sanitize_date_ymd( $raw ): string {

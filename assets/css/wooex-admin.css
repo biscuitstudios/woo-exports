@@ -710,13 +710,23 @@
 .wooex-date-row {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 10px;
-	align-items: center;
+	gap: 10px 20px;
+	/* Columns stack label over field, so align on the fields rather than the
+	   tops. The From/To pair carries inline labels and would otherwise ride
+	   high against the two stacked columns. */
+	align-items: flex-end;
 }
-.wooex-date-row > select {
+.wooex-date-col {
+	display: flex;
+	flex-direction: column;
+	flex: 0 0 auto;
+}
+.wooex-date-col > select {
 	width: auto !important;
 	min-width: 260px;
-	flex: 0 0 auto;
+}
+.wooex-date-col .wooex-field-label {
+	margin-bottom: 8px;
 }
 .wooex-date-row .wooex-custom-dates {
 	display: inline-flex;
@@ -733,6 +743,22 @@
 }
 .wooex-date-row .wooex-custom-dates input[type="date"] {
 	width: auto;
+}
+
+/* Day-start boundary. Sits beside Date Range because it qualifies the range
+   that is selected, and hides entirely for the ranges it does not affect. */
+.wooex-field .wooex-day-start-col input[type="time"] {
+	width: auto;
+	min-width: 150px;
+}
+.wooex-range-note {
+	margin: 8px 0 0;
+	color: #3c434a;
+	font-size: 12px;
+	line-height: 1.5;
+}
+.wooex-range-note strong {
+	font-weight: 600;
 }
 
 /* Disabled (gated) section */

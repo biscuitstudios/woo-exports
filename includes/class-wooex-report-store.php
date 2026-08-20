@@ -115,6 +115,10 @@ class Wooex_Report_Store {
 					'date_range'      => 'today',
 					'date_from'       => '',
 					'date_to'         => '',
+					// Midnight reproduces the pre-0.10.0 windows exactly, so
+					// array_replace_recursive backfills saved reports with the
+					// old behaviour and no migration is needed.
+					'day_start'       => '00:00',
 					'statuses'        => [ 'wc-completed', 'wc-processing' ],
 					'customer_ids'    => [],
 					'product_ids'     => [],

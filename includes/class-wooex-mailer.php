@@ -96,29 +96,34 @@ class Wooex_Mailer {
 	 *
 	 * Public + static so the test suite can hit it without instantiating WP.
 	 */
-	public static function format_range_for_filters( array $filters ): string {
-		$resolved = Wooex_Data_Orders::resolve_dates( $filters );
-		if ( empty( $resolved['from'] ) || empty( $resolved['to'] ) ) {
+	public static function format_range_for_filters( array $filters, ?int $now = null ): string {
+		$resolved = Wooex_Data_Orders::resolve_dates( $filters, $now );
+
+		$from_ts = $resolved['from'] ?? '';
+		$to_ts   = $resolved['to'] ?? '';
+		if ( ! is_int( $from_ts ) || ! is_int( $to_ts ) ) {
 			return '';
 		}
 
-		$fmt = (string) get_option( 'date_format', 'F j, Y' );
-		$tz  = wp_timezone();
+		$date_fmt = (string) get_option( 'date_format', 'F j, Y' );
 
-		// resolve_dates() returns wall-clock strings in site timezone. strtotime()
-		// would parse them in PHP's default timezone (UTC, set by WP), which then
-		// gets shifted back when wp_date() reformats in site tz — producing the
-		// off-by-one-day "May 9 – May 16" / "May 19 – May 20" output. Parsing
-		// with the site timezone here keeps the displayed dates honest.
-		$from_dt = DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $resolved['from'], $tz );
-		$to_dt   = DateTimeImmutable::createFromFormat( 'Y-m-d H:i:s', $resolved['to'], $tz );
-		if ( ! $from_dt || ! $to_dt ) {
-			return '';
+		// resolve_dates() returns timestamps, so wp_date() renders them in the
+		// site timezone directly. The predecessor of this code parsed wall-clock
+		// strings with strtotime(), which WordPress evaluates as UTC, shifting
+		// every displayed date by the site's offset.
+		if ( ! Wooex_Data_Orders::has_custom_day_start( $filters ) ) {
+			$from_str = wp_date( $date_fmt, $from_ts );
+			$to_str   = wp_date( $date_fmt, $to_ts );
+
+			return ( $from_str === $to_str ) ? $from_str : ( $from_str . ' – ' . $to_str );
 		}
 
-		$from_str = wp_date( $fmt, $from_dt->getTimestamp() );
-		$to_str   = wp_date( $fmt, $to_dt->getTimestamp() );
+		// A day that starts at, say, 19:00 spans two calendar dates, so the
+		// dates alone would misdescribe the window by several hours in both
+		// directions. Show times, and never collapse to a single date.
+		$time_fmt = (string) get_option( 'time_format', 'g:i a' );
+		$stamp    = $date_fmt . ' ' . $time_fmt;
 
-		return ( $from_str === $to_str ) ? $from_str : ( $from_str . ' – ' . $to_str );
+		return wp_date( $stamp, $from_ts ) . ' – ' . wp_date( $stamp, $to_ts );
 	}
 }

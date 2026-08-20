@@ -236,6 +236,28 @@
 			$f.find( '.wooex-custom-dates' ).css( 'display', 'custom' === v ? 'inline-flex' : 'none' );
 		}
 
+		// Week, month and year ranges always run midnight to midnight, so the
+		// boundary control is hidden for them rather than left sitting there
+		// doing nothing. The value stays in the form while hidden, so switching
+		// away and back does not lose what was set.
+		function updateDayStart() {
+			var v      = $( '#wooex-field-date-range' ).val();
+			var ranges = W.day_start_ranges || [];
+			var show   = $.inArray( v, ranges ) !== -1;
+			$f.find( '.wooex-day-start-col, .wooex-day-start-help' ).toggle( show );
+		}
+
+		// The resolved-window note is rendered server-side, because working out
+		// what "Yesterday at 19:00" means involves the site timezone, DST and
+		// start_of_week. Reimplementing that here would give two answers that
+		// drift. So on any change to the boundary we mark the note stale rather
+		// than recomputing it.
+		function markRangeNoteStale() {
+			var $note = $f.find( '.wooex-range-note' );
+			if ( ! $note.length ) { return; }
+			$note.show().html( escapeHtml( W.i18n.range_note_stale ) );
+		}
+
 		function updateScheduleFields() {
 			var freq = $( '#wooex-field-frequency' ).val();
 			$f.find( '.wooex-field-weekly' ).toggle( 'weekly' === freq );
@@ -251,11 +273,15 @@
 
 		updateFilterVisibility();
 		updateCustomDates();
+		updateDayStart();
 		updateScheduleFields();
 		updateScheduleGate();
 
 		$f.find( 'select[name="type"]' ).on( 'change', updateFilterVisibility );
 		$f.find( '#wooex-field-date-range' ).on( 'change', updateCustomDates );
+		$f.find( '#wooex-field-date-range' ).on( 'change', updateDayStart );
+		$f.find( '#wooex-field-date-range, #wooex-field-day-start, input[name="date_from"], input[name="date_to"]' )
+			.on( 'change', markRangeNoteStale );
 		$f.find( '#wooex-field-frequency' ).on( 'change', updateScheduleFields );
 		$f.find( '#wooex-field-active' ).on( 'change', updateScheduleGate );
 
@@ -468,6 +494,7 @@
 				date_range:      $( '#wooex-field-date-range' ).val(),
 				date_from:       $f.find( 'input[name="date_from"]' ).val(),
 				date_to:         $f.find( 'input[name="date_to"]' ).val(),
+				day_start:       $f.find( 'input[name="day_start"]' ).val(),
 				statuses:        collectArray( 'statuses' ),
 				customer_ids:    collectArray( 'customer_ids' ),
 				product_ids:     collectArray( 'product_ids' ),

@@ -161,8 +161,17 @@ class Wooex_Data_Attendees {
 		$customer_ids  = Wooex_Data_Products::clean_ids( $filters['customer_ids'] ?? [] );
 		$customer_set  = ! empty( $customer_ids ) ? array_flip( $customer_ids ) : null;
 
-		$from_ts = ! empty( $dates['from'] ) ? strtotime( $dates['from'] ) : null;
-		$to_ts   = ! empty( $dates['to'] ) ? strtotime( $dates['to'] ) : null;
+		// resolve_dates() returns UNIX timestamps, which is what $created_ts is
+		// too, so these compare directly.
+		//
+		// This used to be strtotime() over the wall-clock strings the old
+		// resolve_dates() returned. WordPress forces PHP's default timezone to
+		// UTC, so those strings — wall-clock in SITE time — were parsed as UTC
+		// and every attendee window was shifted by the site's offset. Five hours
+		// on an Eastern site. Attendee row counts change on this release as a
+		// result, and the new numbers are the correct ones.
+		$from_ts = is_int( $dates['from'] ?? null ) ? $dates['from'] : null;
+		$to_ts   = is_int( $dates['to'] ?? null ) ? $dates['to'] : null;
 
 		self::$last_debug['from_ts']    = $from_ts;
 		self::$last_debug['to_ts']      = $to_ts;

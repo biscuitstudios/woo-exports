@@ -104,6 +104,10 @@ class Wooex_Admin {
 				'nonce_war'        => wp_create_nonce( 'wooex_search' ),
 				'nonce_product'    => wp_create_nonce( 'search-products' ),
 				'nonce_preview_dl' => wp_create_nonce( 'wooex_download_preview' ),
+				// Which ranges honour day_start. Passed from PHP rather than
+				// restated here, so the field's visibility cannot disagree with
+				// what the resolver actually does.
+				'day_start_ranges' => Wooex_Data_Orders::DAY_START_RANGES,
 				'i18n'          => [
 					'confirm_delete' => __( 'Delete this export? This cannot be undone.', 'woo-exports' ),
 					'saving'         => __( 'Saving…', 'woo-exports' ),
@@ -114,6 +118,7 @@ class Wooex_Admin {
 					'custom_range_required' => __( 'Custom range requires both From and To dates.', 'woo-exports' ),
 					'custom_range_order'    => __( 'The "To" date must be on or after the "From" date.', 'woo-exports' ),
 					'days_required'         => __( 'Select at least one day of the week.', 'woo-exports' ),
+					'range_note_stale'      => __( 'Save to see the window this resolves to.', 'woo-exports' ),
 				],
 			]
 		);
@@ -746,6 +751,7 @@ class Wooex_Admin {
 
 		$date_from = $this->sanitize_date_ymd( $raw['date_from'] ?? '' );
 		$date_to   = $this->sanitize_date_ymd( $raw['date_to'] ?? '' );
+		$day_start = $this->sanitize_time_hhmm( $raw['day_start'] ?? '00:00', '00:00' );
 
 		$statuses = (array) ( $raw['statuses'] ?? [] );
 		$statuses = array_values( array_filter( array_map( 'sanitize_key', $statuses ) ) );
@@ -754,6 +760,7 @@ class Wooex_Admin {
 			'date_range'      => $date_range,
 			'date_from'       => $date_from,
 			'date_to'         => $date_to,
+			'day_start'       => $day_start,
 			'statuses'        => $statuses,
 			'customer_ids'    => $this->ints( $raw['customer_ids'] ?? [] ),
 			'product_ids'     => $this->ints( $raw['product_ids'] ?? [] ),
@@ -771,10 +778,7 @@ class Wooex_Admin {
 			$frequency = 'daily';
 		}
 
-		$time = sanitize_text_field( $raw['time'] ?? '06:00' );
-		if ( ! preg_match( '/^([0-1]?\d|2[0-3]):([0-5]\d)$/', $time ) ) {
-			$time = '06:00';
-		}
+		$time = $this->sanitize_time_hhmm( $raw['time'] ?? '06:00', '06:00' );
 
 		$valid_days = [ 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday' ];
 
@@ -802,6 +806,19 @@ class Wooex_Admin {
 			'day'          => $days[0], // legacy single-day field, kept in sync with first checked day
 			'day_of_month' => $dom,
 		];
+	}
+
+	/**
+	 * Validate an HH:MM wall-clock time, falling back to $default.
+	 *
+	 * Shared by the filter's `day_start` and the schedule's `time` against
+	 * Wooex_Data_Orders::TIME_PATTERN, so the two cannot drift on what they
+	 * accept. resolve_dates() re-validates with the same pattern, because saved
+	 * options can also be written by code that never passed through here.
+	 */
+	private function sanitize_time_hhmm( $raw, string $default ): string {
+		$value = sanitize_text_field( is_scalar( $raw ) ? (string) $raw : '' );
+		return preg_match( Wooex_Data_Orders::TIME_PATTERN, $value ) ? $value : $default;
 	}
 
 	private function sanitize_date_ymd( $raw ): string {

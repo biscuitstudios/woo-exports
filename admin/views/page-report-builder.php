@@ -57,6 +57,36 @@ $ranges = [
 $cur_type      = $r['type']      ?? 'orders';
 $cur_format    = $r['format']    ?? 'xlsx';
 $cur_range     = $f['date_range'] ?? 'today';
+$cur_day_start = $f['day_start']  ?? '00:00';
+
+// Ranges the boundary does nothing for hide the field rather than showing a
+// control that is inert. Rendered server-side too, so there is no flash of a
+// field that is about to disappear on load.
+$show_day_start = in_array( $cur_range, Wooex_Data_Orders::DAY_START_RANGES, true );
+
+// The window this report resolves to, in the same words the emailed report will
+// use, so the boundary can be checked here rather than discovered in tomorrow
+// morning's inbox.
+//
+// For a scheduled report this is evaluated AT THE NEXT RUN, not now. A shifted
+// day boundary means the window moves with the clock: a report viewed at 3pm
+// and run at 9pm covers two different periods, and the one worth showing is the
+// one that will actually be sent.
+$preview_at    = null;
+$preview_intro = 'Currently resolves to';
+
+if ( $is_edit && ! empty( $r['active'] ) ) {
+	$next_run = Wooex_Scheduler::next_run_timestamp( $r );
+	if ( null !== $next_run ) {
+		$preview_at    = $next_run;
+		$preview_intro = sprintf(
+			'At the next run (%s) this covers',
+			wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next_run )
+		);
+	}
+}
+
+$resolved_range = Wooex_Mailer::format_range_for_filters( $f, $preview_at );
 $cur_frequency = $s['frequency'] ?? 'daily';
 $cur_time      = $s['time']      ?? '06:00';
 $cur_day       = $s['day']       ?? 'monday';
@@ -142,19 +172,45 @@ $download_url = ( $is_edit && ! empty( $r['id'] ) ) ? Wooex_Admin::download_url(
 			<div class="wooex-card-body">
 
 				<div class="wooex-field" data-filter="dates">
-					<label for="wooex-field-date-range">Date Range</label>
 					<div class="wooex-date-row">
-						<select name="date_range" id="wooex-field-date-range">
-							<?php foreach ( $ranges as $val => $label ) : ?>
-								<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $cur_range, $val ); ?>><?php echo esc_html( $label ); ?></option>
-							<?php endforeach; ?>
-						</select>
+						<div class="wooex-date-col">
+							<label class="wooex-field-label" for="wooex-field-date-range">Date Range</label>
+							<select name="date_range" id="wooex-field-date-range">
+								<?php foreach ( $ranges as $val => $label ) : ?>
+									<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $cur_range, $val ); ?>><?php echo esc_html( $label ); ?></option>
+								<?php endforeach; ?>
+							</select>
+						</div>
+
+						<div class="wooex-date-col wooex-day-start-col"<?php echo $show_day_start ? '' : ' style="display:none;"'; ?>>
+							<label class="wooex-field-label" for="wooex-field-day-start">Day starts at</label>
+							<input
+								type="time"
+								name="day_start"
+								id="wooex-field-day-start"
+								step="60"
+								value="<?php echo esc_attr( $cur_day_start ); ?>"
+							/>
+						</div>
 
 						<span class="wooex-custom-dates" style="display:<?php echo 'custom' === $cur_range ? 'inline-flex' : 'none'; ?>;">
 							<label>From <input type="date" name="date_from" value="<?php echo esc_attr( $f['date_from'] ?? '' ); ?>" /></label>
 							<label>To <input type="date" name="date_to" value="<?php echo esc_attr( $f['date_to'] ?? '' ); ?>" /></label>
 						</span>
 					</div>
+
+					<p class="description wooex-day-start-help"<?php echo $show_day_start ? '' : ' style="display:none;"'; ?>>
+						Leave at 12:00&nbsp;AM to export orders for a full day. Setting a time
+						exports orders from that time on, so &ldquo;Yesterday&rdquo; at
+						7:00&nbsp;PM means 7:00&nbsp;PM the previous day through 6:59&nbsp;PM
+						today. Week, month, and year ranges always run from midnight to
+						midnight. Times use the site timezone
+						(<?php echo esc_html( wp_timezone_string() ); ?>).
+					</p>
+					<p class="wooex-range-note"<?php echo '' === $resolved_range ? ' style="display:none;"' : ''; ?>>
+						<?php echo esc_html( $preview_intro ); ?>:
+						<strong><?php echo esc_html( $resolved_range ); ?></strong>
+					</p>
 				</div>
 
 				<div class="wooex-field" data-filter="statuses">

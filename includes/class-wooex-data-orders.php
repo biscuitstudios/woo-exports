@@ -11,6 +11,25 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Wooex_Data_Orders {
 
+	/**
+	 * Validation pattern for an HH:MM wall-clock time. Shared with the admin
+	 * sanitiser so the filter's `day_start` and the schedule's `time` cannot
+	 * drift apart on what they accept.
+	 */
+	public const TIME_PATTERN = '/^([0-1]?\d|2[0-3]):([0-5]\d)$/';
+
+	/**
+	 * The date ranges that honour `day_start`. Everything else is a named
+	 * calendar period and runs midnight to midnight.
+	 *
+	 * The switch in resolve_dates() is the real logic; this list exists so the
+	 * admin view and the JS can hide the field for ranges it does not affect
+	 * without restating the rule. DayStartTest::test_day_start_ranges_constant_
+	 * matches_behaviour() drives every range through the resolver and fails if
+	 * the two ever disagree, so this cannot rot into a lie.
+	 */
+	public const DAY_START_RANGES = [ 'today', 'yesterday', 'custom' ];
+
 	public static function get( array $filters ): array {
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return [];
@@ -135,8 +154,9 @@ class Wooex_Data_Orders {
 
 		$args['status'] = self::normalize_statuses( $filters['statuses'] ?? [] );
 
-		if ( ! empty( $dates['from'] ) && ! empty( $dates['to'] ) ) {
-			$args['date_created'] = $dates['from'] . '...' . $dates['to'];
+		$date_created = self::date_created_arg( $dates );
+		if ( null !== $date_created ) {
+			$args['date_created'] = $date_created;
 		}
 
 		$customer_ids = Wooex_Data_Products::clean_ids( $filters['customer_ids'] ?? [] );
@@ -311,49 +331,99 @@ class Wooex_Data_Orders {
 		return implode( ', ', $parts );
 	}
 
-	public static function resolve_dates( array $filters ): array {
+	/**
+	 * Resolve a report's filters to an inclusive [from, to] window.
+	 *
+	 * Returns UNIX timestamps, not wall-clock strings. That is deliberate and
+	 * load-bearing: `wc_get_orders( [ 'date_created' => 'A...B' ] )` throws away
+	 * the time component when both sides are date strings and silently drops to
+	 * whole-day precision. Passing numerics is the only way to get second
+	 * precision, on both the legacy CPT store and HPOS.
+	 *
+	 * @see \WC_Data_Store_WP::parse_date_for_wp_query()
+	 * @see \Automattic\WooCommerce\Internal\DataStores\Orders\OrdersTableQuery::date_to_date_query_arg()
+	 *
+	 * A day does not have to begin at midnight. The `day_start` filter moves the
+	 * boundary, so a store reconciling against a payment processor's settlement
+	 * cutoff can define its day as, say, 19:00 to 19:00.
+	 *
+	 * `day_start` applies to the ranges that are counted in DAYS — Today,
+	 * Yesterday and Custom — and to nothing else. Week, month and year are named
+	 * calendar periods and keep midnight boundaries whatever the setting is.
+	 * Shifting them would make "Last Month (July)" return 19 hours of August,
+	 * contradicting the label the user picked it by. Nobody sets a settlement
+	 * cutoff in order to redefine what July means.
+	 *
+	 * At the default 00:00 every range resolves exactly as it always has.
+	 *
+	 * @param array    $filters Report filters.
+	 * @param int|null $now     Override the clock. Tests only; production passes null.
+	 * @return array{from:int|string,to:int|string} Empty strings mean "no bound".
+	 */
+	public static function resolve_dates( array $filters, ?int $now = null ): array {
 		$tz    = wp_timezone();
 		$range = $filters['date_range'] ?? 'today';
-		$today = new DateTimeImmutable( 'today', $tz );
 
+		$now_dt = ( null === $now )
+			? new DateTimeImmutable( 'now', $tz )
+			: ( new DateTimeImmutable( '@' . $now ) )->setTimezone( $tz );
+
+		[ $hh, $mm ] = self::parse_day_start( $filters['day_start'] ?? '00:00' );
+
+		// Two reference points, and which one a range uses is the whole design.
+		//
+		// $anchor is the start of the day currently in progress under this
+		// report's boundary. Before today's boundary has passed we are still
+		// inside the day that opened yesterday evening.
+		//
+		// $calendar_today is plain midnight, untouched by day_start.
+		$candidate      = $now_dt->setTime( $hh, $mm, 0 );
+		$anchor         = ( $now_dt < $candidate ) ? $candidate->modify( '-1 day' ) : $candidate;
+		$calendar_today = $now_dt->setTime( 0, 0, 0 );
+
+		// Each branch names the FIRST and LAST day in the window by its start
+		// instant. The window is closed at the far end, computed below.
 		switch ( $range ) {
+			// --- Counted in days. These follow day_start. ---
 			case 'today':
-				$from = $today;
-				$to   = $today;
+				$from_day = $anchor;
+				$to_day   = $anchor;
 				break;
 
 			case 'yesterday':
-				$from = $today->modify( '-1 day' );
-				$to   = $today->modify( '-1 day' );
+				$from_day = $anchor->modify( '-1 day' );
+				$to_day   = $from_day;
 				break;
 
+			// --- Named calendar periods. These ignore day_start entirely, so
+			// "Last Month (July)" is July and nothing else. ---
 			case 'this_week':
-				[ $from, $to ] = self::week_range( $today, 0 );
+				[ $from_day, $to_day ] = self::week_range( $calendar_today, 0 );
 				break;
 
 			case 'last_week':
-				[ $from, $to ] = self::week_range( $today, -1 );
+				[ $from_day, $to_day ] = self::week_range( $calendar_today, -1 );
 				break;
 
 			case 'this_month':
-				$from = $today->modify( 'first day of this month' );
-				$to   = $today;
+				$from_day = $calendar_today->modify( 'first day of this month' );
+				$to_day   = $calendar_today;
 				break;
 
 			case 'last_month':
-				$from = $today->modify( 'first day of last month' );
-				$to   = $today->modify( 'last day of last month' );
+				$from_day = $calendar_today->modify( 'first day of last month' );
+				$to_day   = $calendar_today->modify( 'last day of last month' );
 				break;
 
 			case 'this_year':
-				$from = new DateTimeImmutable( $today->format( 'Y' ) . '-01-01', $tz );
-				$to   = $today;
+				$from_day = $calendar_today->setDate( (int) $calendar_today->format( 'Y' ), 1, 1 );
+				$to_day   = $calendar_today;
 				break;
 
 			case 'last_year':
-				$year = (int) $today->format( 'Y' ) - 1;
-				$from = new DateTimeImmutable( "{$year}-01-01", $tz );
-				$to   = new DateTimeImmutable( "{$year}-12-31", $tz );
+				$year     = (int) $calendar_today->format( 'Y' ) - 1;
+				$from_day = $calendar_today->setDate( $year, 1, 1 );
+				$to_day   = $calendar_today->setDate( $year, 12, 31 );
 				break;
 
 			case 'all_time':
@@ -367,26 +437,95 @@ class Wooex_Data_Orders {
 					return [ 'from' => '', 'to' => '' ];
 				}
 
-				$from = DateTimeImmutable::createFromFormat( 'Y-m-d', $from_raw, $tz ) ?: $today;
-				$to   = DateTimeImmutable::createFromFormat( 'Y-m-d', $to_raw, $tz ) ?: $today;
+				$from_day = self::day_from_ymd( $from_raw, $hh, $mm, $tz ) ?? $anchor;
+				$to_day   = self::day_from_ymd( $to_raw, $hh, $mm, $tz ) ?? $anchor;
 				break;
 
 			default:
-				$from = $today;
-				$to   = $today;
+				$from_day = $anchor;
+				$to_day   = $anchor;
 				break;
 		}
 
+		// The window closes one second before the following day opens. One
+		// formula serves both kinds of range: $to_day carries the boundary time
+		// for day-counted ranges and midnight for calendar ones, so this yields
+		// 18:59:59 in the first case and 23:59:59 in the second.
+		//
+		// `modify('+1 day')` holds wall-clock time across a DST transition, so a
+		// 19:00 boundary stays 19:00 on the 23- and 25-hour days.
+		$end = $to_day->modify( '+1 day' )->modify( '-1 second' );
+
 		return [
-			'from' => $from->format( 'Y-m-d' ) . ' 00:00:00',
-			'to'   => $to->format( 'Y-m-d' ) . ' 23:59:59',
+			'from' => $from_day->getTimestamp(),
+			'to'   => $end->getTimestamp(),
 		];
 	}
 
 	/**
-	 * Returns [start, end] DateTimeImmutable for a week relative to today,
-	 * honouring WordPress's start_of_week option (0=Sun … 6=Sat).
-	 * $offset_weeks: 0 = current week, -1 = last week.
+	 * True when this report's day boundary is something other than midnight.
+	 * Callers use it to decide whether a window can be described by dates alone.
+	 */
+	public static function has_custom_day_start( array $filters ): bool {
+		return [ 0, 0 ] !== self::parse_day_start( $filters['day_start'] ?? '00:00' );
+	}
+
+	/**
+	 * Parse an HH:MM day-start into [hour, minute]. Anything malformed falls
+	 * back to midnight, which is the behaviour the plugin had before day_start
+	 * existed — a bad value degrades to the old default rather than to an
+	 * arbitrary window.
+	 */
+	public static function parse_day_start( $raw ): array {
+		$raw = is_scalar( $raw ) ? trim( (string) $raw ) : '';
+		if ( '' === $raw || ! preg_match( self::TIME_PATTERN, $raw ) ) {
+			return [ 0, 0 ];
+		}
+		[ $hh, $mm ] = array_map( 'intval', explode( ':', $raw ) );
+		return [ $hh, $mm ];
+	}
+
+	/**
+	 * Build the `date_created` argument for wc_get_orders() from a resolved
+	 * window, or null when the window is unbounded (All Time).
+	 *
+	 * Both sides must reach WooCommerce as numerics. If either is a date string
+	 * the query silently degrades to whole-day precision and the day_start
+	 * boundary is discarded. Shared with Wooex_Data_Customers so the two query
+	 * paths cannot drift on that.
+	 *
+	 * @param array{from:int|string,to:int|string} $dates
+	 */
+	public static function date_created_arg( array $dates ): ?string {
+		$from = $dates['from'] ?? '';
+		$to   = $dates['to'] ?? '';
+
+		if ( ! is_int( $from ) || ! is_int( $to ) ) {
+			return null;
+		}
+		return $from . '...' . $to;
+	}
+
+	/**
+	 * A 'Y-m-d' custom-range date as the instant that day begins under this
+	 * report's boundary.
+	 * Returns null if the string is not a real date, so the caller can decide
+	 * the fallback rather than silently receiving today.
+	 */
+	private static function day_from_ymd( string $ymd, int $hh, int $mm, DateTimeZone $tz ): ?DateTimeImmutable {
+		$dt = DateTimeImmutable::createFromFormat( 'Y-m-d', $ymd, $tz );
+		if ( ! $dt ) {
+			return null;
+		}
+		return $dt->setTime( $hh, $mm, 0 );
+	}
+
+	/**
+	 * Returns [first day, last day] of a week relative to $today, honouring
+	 * WordPress's start_of_week option (0=Sun … 6=Sat).
+	 *
+	 * Always called with plain midnight. A week is a calendar week and does not
+	 * move with day_start. $offset_weeks: 0 = current week, -1 = last week.
 	 */
 	private static function week_range( DateTimeImmutable $today, int $offset_weeks ): array {
 		$start_of_week = (int) get_option( 'start_of_week', 1 );

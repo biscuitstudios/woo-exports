@@ -22,8 +22,9 @@ class Wooex_Data_Customers {
 			'limit'  => -1,
 			'return' => 'objects',
 		];
-		if ( ! empty( $dates['from'] ) && ! empty( $dates['to'] ) ) {
-			$order_args['date_created'] = $dates['from'] . '...' . $dates['to'];
+		$date_created = Wooex_Data_Orders::date_created_arg( $dates );
+		if ( null !== $date_created ) {
+			$order_args['date_created'] = $date_created;
 		}
 
 		$statuses = Wooex_Data_Orders::normalize_statuses( $filters['statuses'] ?? [] );

@@ -21,3 +21,6 @@ docs/
 vendor/
 .claude/
 .phpunit.result.cache
+
+# Snapshots written by tests/integration/guard.sh
+tests/integration/.results/

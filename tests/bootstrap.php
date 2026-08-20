@@ -73,6 +73,10 @@ if ( ! function_exists( 'error_log' ) ) {
 	function error_log( string $msg ): bool { return true; }
 }
 
+// Pure, WordPress-free, so the integration scripts' safety guard can be tested
+// without a database. See tests/DevSiteCheckTest.php.
+require_once __DIR__ . '/integration/dev-site-check.php';
+
 require_once __DIR__ . '/../includes/class-wooex-scheduler.php';
 require_once __DIR__ . '/../includes/class-wooex-data-products.php';
 require_once __DIR__ . '/../includes/class-wooex-data-attendees.php';

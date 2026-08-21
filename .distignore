@@ -20,4 +20,5 @@
 /README.md
 /SECURITY.md
 /.claude
+/.phpunit.cache
 /.phpunit.result.cache

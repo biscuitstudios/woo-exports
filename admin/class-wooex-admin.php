@@ -31,6 +31,7 @@ class Wooex_Admin {
 		add_action( 'wp_ajax_wooex_review_report',   [ $this, 'ajax_review_report' ] );
 		add_action( 'wp_ajax_wooex_search_parent_posts', [ $this, 'ajax_search_parent_posts' ] );
 		add_action( 'wp_ajax_wooex_search_customers',    [ $this, 'ajax_search_customers' ] );
+		add_action( 'wp_ajax_wooex_search_products',     [ $this, 'ajax_search_products' ] );
 
 		add_action( 'admin_post_wooex_download_report',  [ $this, 'handle_download_report' ] );
 		add_action( 'admin_post_wooex_download_preview', [ $this, 'handle_download_preview' ] );
@@ -102,7 +103,6 @@ class Wooex_Admin {
 				'admin_post_url'   => admin_url( 'admin-post.php' ),
 				'nonce'            => wp_create_nonce( self::NONCE ),
 				'nonce_war'        => wp_create_nonce( 'wooex_search' ),
-				'nonce_product'    => wp_create_nonce( 'search-products' ),
 				'nonce_preview_dl' => wp_create_nonce( 'wooex_download_preview' ),
 				// Which ranges honour day_start. Passed from PHP rather than
 				// restated here, so the field's visibility cannot disagree with
@@ -470,6 +470,34 @@ class Wooex_Admin {
 		wp_send_json_success( $report );
 	}
 
+	/**
+	 * The clock a preview should resolve its date range against.
+	 *
+	 * With a shifted day boundary the window moves with the time of day: the
+	 * same "Yesterday at 7:00 pm" report previewed at 10am and sent at 9pm
+	 * covers two different periods, a whole day apart. The builder prints the
+	 * window for the NEXT SCHEDULED RUN, so a preview evaluated at "now" would
+	 * contradict the sentence sitting directly above the button.
+	 *
+	 * The clock comes from the saved schedule, not from whatever is in the form
+	 * right now. That is deliberate: the note is rendered from the saved report
+	 * too, so the two cannot disagree. Unsaved schedule edits are covered by the
+	 * note going stale on change.
+	 *
+	 * Returns null when the report is unsaved or not scheduled. There "now" is
+	 * the only meaningful answer, and the note says "Currently resolves to".
+	 */
+	private function preview_reference_ts( string $id ): ?int {
+		if ( '' === $id ) {
+			return null;
+		}
+		$report = Wooex_Report_Store::get( $id );
+		if ( ! $report || empty( $report['active'] ) ) {
+			return null;
+		}
+		return Wooex_Scheduler::next_run_timestamp( $report );
+	}
+
 	public function ajax_review_report(): void {
 		$this->guard();
 
@@ -481,6 +509,10 @@ class Wooex_Admin {
 		if ( 'attendees' === $type && ! Wooex_Data_Attendees::is_available() ) {
 			wp_send_json_error( [ 'message' => 'Attendees report type is unavailable on this site.' ], 400 );
 		}
+
+		$preview_at = $this->preview_reference_ts(
+			sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) )
+		);
 
 		// Large all-time / this-year queries can churn through tens of thousands
 		// of orders. Without these, PHP hits its default memory/time ceiling and
@@ -539,13 +571,13 @@ class Wooex_Admin {
 					// Use the paginated loader — runs COUNT(*) + LIMIT 20 instead
 					// of loading every matching order into memory. Critical for
 					// All Time on sites with hundreds of thousands of orders.
-					$result = Wooex_Data_Orders::get_paginated( $filters, $preview_limit );
+					$result = Wooex_Data_Orders::get_paginated( $filters, $preview_limit, $preview_at );
 					$rows   = $result['rows'];
 					$total  = $result['total'];
 					break;
 				case 'products':  $rows = Wooex_Data_Products::get( $filters );  break;
-				case 'customers': $rows = Wooex_Data_Customers::get( $filters ); break;
-				case 'attendees': $rows = Wooex_Data_Attendees::get( $filters ); break;
+				case 'customers': $rows = Wooex_Data_Customers::get( $filters, $preview_at ); break;
+				case 'attendees': $rows = Wooex_Data_Attendees::get( $filters, $preview_at ); break;
 				default:          $rows = [];
 			}
 		} catch ( \Throwable $e ) {
@@ -580,11 +612,22 @@ class Wooex_Admin {
 			$total = count( $rows );
 		}
 
+		// State the window the preview actually ran over. Without it a
+		// boundary-shifted range is invisible: the rows look plausible and the
+		// only way to notice a mismatch is to read order dates by eye.
+		$range_str = ( 'products' === $type )
+			? ''
+			: Wooex_Mailer::format_range_for_filters( $filters, $preview_at );
+
 		wp_send_json_success(
 			[
-				'rows'  => array_slice( $rows, 0, $preview_limit ),
-				'count' => $total,
-				'time'  => round( $elapsed, 3 ),
+				'rows'     => array_slice( $rows, 0, $preview_limit ),
+				'count'    => $total,
+				'time'     => round( $elapsed, 3 ),
+				'range'    => $range_str,
+				'range_at' => ( null === $preview_at )
+					? ''
+					: wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $preview_at ),
 			]
 		);
 	}
@@ -624,6 +667,12 @@ class Wooex_Admin {
 
 		$filters = $this->sanitize_filters( $_POST['filters'] ?? [] );
 
+		// Same clock as the on-screen preview, so the downloaded file and the
+		// table it was generated from hold the same rows.
+		$preview_at = $this->preview_reference_ts(
+			sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) )
+		);
+
 		$report = [
 			'id'      => 'preview-' . wp_generate_password( 8, false, false ),
 			'type'    => $type,
@@ -631,7 +680,7 @@ class Wooex_Admin {
 			'filters' => $filters,
 		];
 
-		$path = Wooex_Exporter::run( $report );
+		$path = Wooex_Exporter::run( $report, $preview_at );
 		if ( false === $path || ! file_exists( $path ) ) {
 			wp_die( 'Preview download failed — see PHP error log for [WooExports] entries.' );
 		}
@@ -796,6 +845,13 @@ class Wooex_Admin {
 		if ( empty( $days ) ) {
 			$days = [ 'monday' ];
 		}
+
+		// Store in week order rather than the order the checkboxes happened to
+		// POST in, so the list table's "Sun, Tue, Thu" summary reads the same for
+		// a report saved today and one saved before the checkbox row was
+		// reordered. Sunday first, matching the builder.
+		$week_order = [ 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday' ];
+		$days       = array_values( array_intersect( $week_order, $days ) );
 
 		$dom = max( 1, min( 28, (int) ( $raw['day_of_month'] ?? 1 ) ) );
 
@@ -1010,6 +1066,116 @@ class Wooex_Admin {
 			$results[] = [
 				'id'   => $id,
 				'text' => sprintf( '%s (%s)', $user->display_name, $user->user_email ),
+			];
+		}
+
+		wp_send_json( [ 'results' => $results ] );
+	}
+
+	/**
+	 * Product search for the Products filter.
+	 *
+	 * This replaces WooCommerce's `woocommerce_json_search_products`, which is
+	 * the wrong tool for a catalogue with families of similarly-named products.
+	 * That endpoint runs `ORDER BY post_parent ASC, post_title ASC LIMIT 30`
+	 * with no notion of relevance, so a search for "Rhodes" on a site holding
+	 * 30+ "Legends and Lore at Rhodes Hall" tickets returns nothing but those
+	 * and never reaches "Rhodes Hall Tour". The matches exist; they are sorted
+	 * off the end of the list, and the dropdown gives no hint that happened.
+	 *
+	 * @see \WC_Product_Data_Store_CPT::search_products()
+	 *
+	 * Two changes fix it. Results are bucketed by how the term matched — exact
+	 * title, then title starting with the term, then anything else — so a
+	 * leading match can never be crowded out by alphabetically earlier
+	 * substring matches. And the cap is 100 rather than 30.
+	 *
+	 * There is still a cap, and a truncated list says so rather than pretending
+	 * to be complete. "Rhodes" alone matches 171 products on the site this was
+	 * found on.
+	 *
+	 * Drafts and private products are searchable too. Reports run over historic
+	 * orders, and the product a past event sold through is often no longer
+	 * published.
+	 */
+	public function ajax_search_products(): void {
+		check_ajax_referer( 'wooex_search', 'security' );
+
+		if ( ! current_user_can( 'manage_woocommerce' ) ) {
+			wp_send_json_error( 'Unauthorized', 403 );
+		}
+
+		$term = isset( $_GET['term'] ) ? sanitize_text_field( wp_unslash( $_GET['term'] ) ) : '';
+		if ( strlen( $term ) < 3 && ! ctype_digit( $term ) ) {
+			wp_send_json( [ 'results' => [] ] );
+		}
+
+		global $wpdb;
+
+		$esc        = $wpdb->esc_like( $term );
+		$contains   = '%' . $esc . '%';
+		$starts     = $esc . '%';
+		$exact      = $esc;
+		$statuses   = [ 'publish', 'private', 'draft' ];
+		$status_ph  = implode( ',', array_fill( 0, count( $statuses ), '%s' ) );
+		$id_match   = ctype_digit( $term ) ? (int) $term : 0;
+		$limit      = 100;
+
+		// GROUP BY rather than DISTINCT: the _sku join is one row per product in
+		// practice, but a duplicated meta row would otherwise double the entry.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT p.ID, p.post_title, p.post_status, MAX(sku.meta_value) AS sku
+				 FROM {$wpdb->posts} p
+				 LEFT JOIN {$wpdb->postmeta} sku
+				   ON sku.post_id = p.ID AND sku.meta_key = '_sku'
+				 WHERE p.post_type = 'product'
+				   AND p.post_status IN ($status_ph)
+				   AND ( p.post_title LIKE %s OR sku.meta_value LIKE %s OR p.ID = %d )
+				 GROUP BY p.ID, p.post_title, p.post_status
+				 ORDER BY
+				   CASE
+				     WHEN p.ID = %d THEN 0
+				     WHEN p.post_title LIKE %s THEN 1
+				     WHEN p.post_title LIKE %s THEN 2
+				     ELSE 3
+				   END,
+				   p.post_title ASC
+				 LIMIT %d",
+				array_merge(
+					$statuses,
+					[ $contains, $contains, $id_match, $id_match, $exact, $starts, $limit ]
+				)
+			)
+		);
+
+		$results = [];
+		foreach ( (array) $rows as $r ) {
+			// Same label shape as preselected_labels(), so a product reads
+			// identically whether it was just searched for or restored from a
+			// saved report.
+			$label = $r->post_title;
+			if ( ! empty( $r->sku ) ) {
+				$label .= ' (' . $r->sku . ')';
+			}
+			$label .= ' #' . (int) $r->ID;
+			if ( 'publish' !== $r->post_status ) {
+				$label .= ' — ' . $r->post_status;
+			}
+
+			$results[] = [
+				'id'   => (int) $r->ID,
+				'text' => $label,
+			];
+		}
+
+		// A full page means there is probably more behind it. Say so — a list
+		// that quietly stops at the cap reads as "that is everything".
+		if ( count( $results ) >= $limit ) {
+			$results[] = [
+				'id'       => '',
+				'text'     => sprintf( 'Showing the first %d matches — type more to narrow.', $limit ),
+				'disabled' => true,
 			];
 		}
 

@@ -53,6 +53,8 @@ zip -r -X "$ZIP" "$SLUG" \
   -x "$SLUG/composer.json" \
   -x "$SLUG/composer.lock" \
   -x "$SLUG/phpunit.xml.dist" \
+  -x "$SLUG/.phpunit.cache/*" \
+  -x "$SLUG/.phpunit.result.cache" \
   -x "$SLUG/.distignore" \
   -x "$SLUG/.git/*" \
   -x "$SLUG/.gitignore" \

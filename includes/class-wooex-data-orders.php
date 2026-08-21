@@ -30,12 +30,12 @@ class Wooex_Data_Orders {
 	 */
 	public const DAY_START_RANGES = [ 'today', 'yesterday', 'custom' ];
 
-	public static function get( array $filters ): array {
+	public static function get( array $filters, ?int $now = null ): array {
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return [];
 		}
 
-		$args = self::build_query_args( $filters );
+		$args = self::build_query_args( $filters, $now );
 		if ( false === $args ) {
 			return [];
 		}
@@ -92,12 +92,12 @@ class Wooex_Data_Orders {
 	 *
 	 * @return array{rows: array<int,array<string,mixed>>, total: int}
 	 */
-	public static function get_paginated( array $filters, int $limit ): array {
+	public static function get_paginated( array $filters, int $limit, ?int $now = null ): array {
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return [ 'rows' => [], 'total' => 0 ];
 		}
 
-		$args = self::build_query_args( $filters );
+		$args = self::build_query_args( $filters, $now );
 		if ( false === $args ) {
 			return [ 'rows' => [], 'total' => 0 ];
 		}
@@ -143,8 +143,8 @@ class Wooex_Data_Orders {
 	 *
 	 * @return array<string,mixed>|false
 	 */
-	private static function build_query_args( array $filters ) {
-		$dates = self::resolve_dates( $filters );
+	private static function build_query_args( array $filters, ?int $now = null ) {
+		$dates = self::resolve_dates( $filters, $now );
 
 		$args = [
 			'limit'   => -1,

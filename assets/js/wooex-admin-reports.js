@@ -214,7 +214,7 @@
 		initLocal( $( '#wooex-field-product-cat-ids' ) );
 		initLocal( $( '#wooex-field-product-tag-ids' ) );
 		initAjax( $( '#wooex-field-customer-ids' ), 'wooex_search_customers', W.nonce_war );
-		initAjax( $( '#wooex-field-product-ids' ), 'woocommerce_json_search_products', W.nonce_product );
+		initAjax( $( '#wooex-field-product-ids' ), 'wooex_search_products', W.nonce_war );
 		initAjax( $( '#wooex-field-parent-post-ids' ), 'wooex_search_parent_posts', W.nonce_war );
 
 		function updateFilterVisibility() {
@@ -372,6 +372,10 @@
 			var payload = {
 				action:      'wooex_review_report',
 				_ajax_nonce: W.nonce,
+				// The saved report's schedule sets the clock the date range
+				// resolves against, so a boundary-shifted preview matches the
+				// window printed under Date Range. Empty on an unsaved report.
+				id:          $f.find( 'input[name="id"]' ).val() || '',
 				type:        $f.find( 'select[name="type"]' ).val(),
 				filters:     collectFilters(),
 			};
@@ -428,6 +432,7 @@
 			var $form = $( '<form>', { method: 'post', action: W.admin_post_url } );
 			$form.append( hidden( 'action', 'wooex_download_preview' ) );
 			$form.append( hidden( '_wpnonce', W.nonce_preview_dl ) );
+			$form.append( hidden( 'id', $f.find( 'input[name="id"]' ).val() || '' ) );
 			$form.append( hidden( 'type', $f.find( 'select[name="type"]' ).val() ) );
 			appendFilterFields( $form, 'filters', collectFilters() );
 			$form.appendTo( 'body' ).trigger( 'submit' ).remove();
@@ -459,6 +464,17 @@
 			var html = '<p><strong>' + count + '</strong> row' + ( 1 === count ? '' : 's' );
 			if ( 'undefined' !== typeof time ) html += ' in ' + time + 's';
 			html += '.</p>';
+
+			// Say which window produced these rows. For a scheduled report that
+			// is the next run's window, not this minute's, so name the moment
+			// too rather than leaving the reader to guess.
+			if ( data.range ) {
+				html += '<p class="wooex-review-range">'
+					+ ( data.range_at
+						? 'At the next run (' + escapeHtml( data.range_at ) + ') this covers: '
+						: 'Covering: ' )
+					+ '<strong>' + escapeHtml( data.range ) + '</strong></p>';
+			}
 
 			if ( ! rows.length ) {
 				$out.html( html );

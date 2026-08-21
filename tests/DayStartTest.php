@@ -286,6 +286,35 @@ final class DayStartTest extends TestCase {
 		);
 	}
 
+	/**
+	 * The clock a preview is evaluated against is load-bearing, not decorative.
+	 *
+	 * Reported August 21, 2026: the builder said the next run would cover
+	 * August 20 7:00 pm – August 21 6:59 pm, while Preview Export returned
+	 * August 19 7:00 pm – August 20 6:59 pm. Both were correct for their own
+	 * clock. The preview was evaluated at 6:36 pm, before the 7:00 pm boundary
+	 * had passed, and the scheduled run fires at 9:00 pm after it has.
+	 *
+	 * The fix was to give the preview the next run's clock. This pins the two
+	 * answers so a future change cannot quietly collapse them back together —
+	 * and so the difference stays documented rather than looking like a bug.
+	 */
+	public function test_preview_clock_and_run_clock_differ_across_the_boundary(): void {
+		$filters = [ 'date_range' => 'yesterday', 'day_start' => '19:00' ];
+
+		$this->assertSame(
+			'August 19, 2026 7:00 pm – August 20, 2026 6:59 pm',
+			Wooex_Mailer::format_range_for_filters( $filters, $this->ts( '2026-08-21 18:36:00' ) ),
+			'Before the boundary, "yesterday" is the day that closed last night.'
+		);
+
+		$this->assertSame(
+			'August 20, 2026 7:00 pm – August 21, 2026 6:59 pm',
+			Wooex_Mailer::format_range_for_filters( $filters, $this->ts( '2026-08-21 21:00:00' ) ),
+			'After the boundary, "yesterday" is the day that closed this evening.'
+		);
+	}
+
 	public function test_all_time_ignores_the_boundary(): void {
 		$r = Wooex_Data_Orders::resolve_dates(
 			[ 'date_range' => 'all_time', 'day_start' => '19:00' ],

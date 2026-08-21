@@ -19,14 +19,18 @@
 }
 
 /* ============================================================
-   Toast notifications — fixed bottom-left, aligned to #wpcontent.
+   Toast notifications — fixed top-left, aligned to #wpcontent.
    JS sets the actual `left` on init/resize/menu-fold; this is the
    pre-JS fallback assuming a standard 160px expanded sidebar.
+
+   The top offset clears the admin bar, which is itself fixed. Core
+   sets --wp-admin--admin-bar--height on <html> (32px desktop, 46px
+   on the mobile breakpoint); the fallback covers a page without it.
    ============================================================ */
 
 .wooex-notice-area {
 	position: fixed;
-	bottom: 24px;
+	top: calc(var(--wp-admin--admin-bar--height, 32px) + 24px);
 	left: 180px;
 	z-index: 100050;
 	width: 360px;
@@ -59,7 +63,7 @@
 	border-left-color: #d63638;
 }
 @keyframes warToastIn {
-	from { opacity: 0; transform: translateY(8px); }
+	from { opacity: 0; transform: translateY(-8px); }
 	to   { opacity: 1; transform: translateY(0); }
 }
 
@@ -758,6 +762,18 @@
 	line-height: 1.5;
 }
 .wooex-range-note strong {
+	font-weight: 600;
+}
+
+/* The window a preview actually ran over — same treatment as the note under
+   Date Range, because it is answering the same question. */
+.wooex-review-range {
+	margin: 0 0 12px;
+	color: #3c434a;
+	font-size: 12px;
+	line-height: 1.5;
+}
+.wooex-review-range strong {
 	font-weight: 600;
 }
 

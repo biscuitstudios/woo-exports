@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.10.0
+Stable tag: 0.10.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,23 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.10.1 =
+* Fix: Preview Export now resolves its date range against the next scheduled
+  run, the same moment the window printed under Date Range is calculated for.
+  Previewing a boundary-shifted report before the boundary had passed returned
+  the previous day's window, one day off from what the note said the next email
+  would cover. Both now agree, and the preview states the window it used.
+* Fix: the Products filter could not find products whose names sort late among
+  their matches. WooCommerce's product search returns 30 rows ordered
+  alphabetically with no notion of relevance, so a search for "Rhodes" on a site
+  with 30+ "Legends and Lore at Rhodes Hall" tickets never reached "Rhodes Hall
+  Tour". Replaced with a search that ranks exact and leading matches first and
+  returns up to 100. Drafts and private products are now findable too, since
+  reports often run over products a past event sold through.
+* Change: Sunday now leads the Days of Week row in the schedule.
+* Change: toast notifications appear at the top of the screen instead of the
+  bottom.
 
 = 0.10.0 =
 * New: "Day starts at" filter. Set a report's day boundary to something other

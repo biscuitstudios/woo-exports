@@ -20,6 +20,7 @@ docs/
 # built zip from the Releases page and copy its vendor/ across.
 vendor/
 .claude/
+.phpunit.cache/
 .phpunit.result.cache
 
 # Snapshots written by tests/integration/guard.sh

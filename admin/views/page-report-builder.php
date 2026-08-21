@@ -26,6 +26,13 @@ $selected_cat_ids = array_map( 'intval', (array) ( $f['product_cat_ids'] ?? [] )
 $selected_tag_ids = array_map( 'intval', (array) ( $f['product_tag_ids'] ?? [] ) );
 
 $valid_days     = [ 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday' ];
+
+// Render order only. Sunday leads the row because that is where a US week
+// starts; the canonical list above stays ISO-ordered because that is what the
+// scheduler validates against. Order has no effect on scheduling — the
+// scheduler sorts its candidate timestamps before picking one.
+$display_days = [ 'sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday' ];
+
 $selected_days  = (array) ( $s['days'] ?? [] );
 if ( empty( $selected_days ) && ! empty( $s['day'] ) ) {
 	$selected_days = [ $s['day'] ];
@@ -317,7 +324,7 @@ $download_url = ( $is_edit && ! empty( $r['id'] ) ) ? Wooex_Admin::download_url(
 					<div class="wooex-field wooex-field-weekly" style="display:<?php echo 'weekly' === $cur_frequency ? 'block' : 'none'; ?>;">
 						<span class="wooex-field-label">Days of Week</span>
 						<div class="wooex-days-grid">
-							<?php foreach ( $valid_days as $d ) : ?>
+							<?php foreach ( $display_days as $d ) : ?>
 								<label class="wooex-day-check">
 									<input type="checkbox" name="days[]" value="<?php echo esc_attr( $d ); ?>" <?php checked( in_array( $d, $selected_days, true ) ); ?> />
 									<?php echo esc_html( ucfirst( $d ) ); ?>

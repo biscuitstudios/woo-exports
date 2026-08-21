@@ -11,12 +11,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Wooex_Data_Customers {
 
-	public static function get( array $filters ): array {
+	public static function get( array $filters, ?int $now = null ): array {
 		if ( ! function_exists( 'wc_get_orders' ) ) {
 			return [];
 		}
 
-		$dates = Wooex_Data_Orders::resolve_dates( $filters );
+		$dates = Wooex_Data_Orders::resolve_dates( $filters, $now );
 
 		$order_args = [
 			'limit'  => -1,

@@ -100,7 +100,7 @@ class Wooex_Data_Attendees {
 
 	public static array $last_debug = [];
 
-	public static function get( array $filters ): array {
+	public static function get( array $filters, ?int $now = null ): array {
 		self::$last_debug = [];
 
 		if ( ! self::is_available() ) {
@@ -156,7 +156,7 @@ class Wooex_Data_Attendees {
 			return [];
 		}
 
-		$dates         = Wooex_Data_Orders::resolve_dates( $filters );
+		$dates         = Wooex_Data_Orders::resolve_dates( $filters, $now );
 		$status_filter = Wooex_Data_Orders::normalize_statuses( $filters['statuses'] ?? [] );
 		$customer_ids  = Wooex_Data_Products::clean_ids( $filters['customer_ids'] ?? [] );
 		$customer_set  = ! empty( $customer_ids ) ? array_flip( $customer_ids ) : null;

@@ -16,8 +16,15 @@ class Wooex_Exporter {
 	/**
 	 * Run a report. Returns the absolute path of the generated file, or false on failure.
 	 * After a successful or failed run, self::$last_row_count holds the row count.
+	 *
+	 * @param array    $report Report config.
+	 * @param int|null $now    Clock the date range resolves against. Null means
+	 *                         "right now", which is what a scheduled run and a
+	 *                         run-now download both want. The builder's preview
+	 *                         passes the next scheduled run instead, so what it
+	 *                         shows matches the window the next email will cover.
 	 */
-	public static function run( array $report ) {
+	public static function run( array $report, ?int $now = null ) {
 		self::$last_row_count = 0;
 
 		// Large all-time exports can churn through tens of thousands of orders.
@@ -31,7 +38,7 @@ class Wooex_Exporter {
 		$format  = (string) ( $report['format'] ?? 'xlsx' );
 		$filters = (array) ( $report['filters'] ?? [] );
 
-		$rows = self::query_rows( $type, $filters );
+		$rows = self::query_rows( $type, $filters, $now );
 		if ( null === $rows ) {
 			error_log( '[WooExports] Export failed: unknown report type "' . $type . '"' );
 			return false;
@@ -71,16 +78,17 @@ class Wooex_Exporter {
 		return $ok ? $path : false;
 	}
 
-	private static function query_rows( string $type, array $filters ): ?array {
+	private static function query_rows( string $type, array $filters, ?int $now = null ): ?array {
 		switch ( $type ) {
+			// Products carry no date filter, so there is no clock to pass.
 			case 'products':
 				return Wooex_Data_Products::get( $filters );
 			case 'orders':
-				return Wooex_Data_Orders::get( $filters );
+				return Wooex_Data_Orders::get( $filters, $now );
 			case 'customers':
-				return Wooex_Data_Customers::get( $filters );
+				return Wooex_Data_Customers::get( $filters, $now );
 			case 'attendees':
-				return Wooex_Data_Attendees::is_available() ? Wooex_Data_Attendees::get( $filters ) : [];
+				return Wooex_Data_Attendees::is_available() ? Wooex_Data_Attendees::get( $filters, $now ) : [];
 		}
 		return null;
 	}

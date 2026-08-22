@@ -764,6 +764,16 @@
 .wooex-range-note strong {
 	font-weight: 600;
 }
+/* In flight to the server. Dimmed rather than blanked, so the previous answer
+   stays readable but is visibly not the current one. */
+.wooex-range-note.is-refreshing {
+	opacity: 0.45;
+}
+@media (prefers-reduced-motion: no-preference) {
+	.wooex-range-note {
+		transition: opacity 0.15s ease-out;
+	}
+}
 
 /* The window a preview actually ran over — same treatment as the note under
    Date Range, because it is answering the same question. */

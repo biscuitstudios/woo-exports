@@ -247,15 +247,59 @@
 			$f.find( '.wooex-day-start-col, .wooex-day-start-help' ).toggle( show );
 		}
 
-		// The resolved-window note is rendered server-side, because working out
-		// what "Yesterday at 19:00" means involves the site timezone, DST and
-		// start_of_week. Reimplementing that here would give two answers that
-		// drift. So on any change to the boundary we mark the note stale rather
-		// than recomputing it.
-		function markRangeNoteStale() {
+		// The resolved-window note stays server-side, because working out what
+		// "Yesterday at 19:00" means involves the site timezone, DST and
+		// start_of_week. Reimplementing that here would give a second answer free
+		// to drift from the one the export actually uses. So rather than
+		// recomputing it in the browser, or marking it stale until the next save,
+		// we ask PHP again on every change.
+		var rangeNoteTimer = null;
+		var rangeNoteReq   = null;
+
+		function refreshRangeNote() {
 			var $note = $f.find( '.wooex-range-note' );
 			if ( ! $note.length ) { return; }
-			$note.show().html( escapeHtml( W.i18n.range_note_stale ) );
+
+			$note.addClass( 'is-refreshing' );
+			clearTimeout( rangeNoteTimer );
+
+			// Debounced, and the in-flight request is aborted rather than left to
+			// land. Without the abort a slow earlier response can arrive after a
+			// fast later one and overwrite the newer answer.
+			rangeNoteTimer = setTimeout( function () {
+				if ( rangeNoteReq ) { rangeNoteReq.abort(); }
+
+				rangeNoteReq = $.post( W.ajax_url, {
+					action:      'wooex_resolve_range',
+					_ajax_nonce: W.nonce,
+					active:      isScheduled() ? 1 : 0,
+					filters:     collectFilters(),
+					schedule:    collectSchedule(),
+				} )
+					.done( function ( res ) {
+						if ( ! res || ! res.success ) {
+							$note.show().html( escapeHtml( W.i18n.range_note_error ) );
+							return;
+						}
+						// All Time has no window to describe, so the note goes away
+						// rather than sitting there empty.
+						if ( ! res.data.range ) {
+							$note.hide().empty();
+							return;
+						}
+						$note.show().html(
+							escapeHtml( res.data.intro ) + ': <strong>'
+							+ escapeHtml( res.data.range ) + '</strong>'
+						);
+					} )
+					.fail( function ( xhr, status ) {
+						if ( 'abort' === status ) { return; }
+						$note.show().html( escapeHtml( W.i18n.range_note_error ) );
+					} )
+					.always( function () {
+						$note.removeClass( 'is-refreshing' );
+					} );
+			}, 250 );
 		}
 
 		function updateScheduleFields() {
@@ -280,8 +324,14 @@
 		$f.find( 'select[name="type"]' ).on( 'change', updateFilterVisibility );
 		$f.find( '#wooex-field-date-range' ).on( 'change', updateCustomDates );
 		$f.find( '#wooex-field-date-range' ).on( 'change', updateDayStart );
+		// The window moves with the range and the boundary. The moment it is
+		// evaluated at moves with the schedule, because a scheduled report is
+		// described at its next run. So both sets of fields refresh the note.
 		$f.find( '#wooex-field-date-range, #wooex-field-day-start, input[name="date_from"], input[name="date_to"]' )
-			.on( 'change', markRangeNoteStale );
+			.on( 'change', refreshRangeNote );
+		$f.find( '#wooex-field-frequency, #wooex-field-time, #wooex-field-dom, #wooex-field-active' )
+			.on( 'change', refreshRangeNote );
+		$f.on( 'change', 'input[name="days[]"]', refreshRangeNote );
 		$f.find( '#wooex-field-frequency' ).on( 'change', updateScheduleFields );
 		$f.find( '#wooex-field-active' ).on( 'change', updateScheduleGate );
 
@@ -372,12 +422,13 @@
 			var payload = {
 				action:      'wooex_review_report',
 				_ajax_nonce: W.nonce,
-				// The saved report's schedule sets the clock the date range
-				// resolves against, so a boundary-shifted preview matches the
-				// window printed under Date Range. Empty on an unsaved report.
-				id:          $f.find( 'input[name="id"]' ).val() || '',
 				type:        $f.find( 'select[name="type"]' ).val(),
 				filters:     collectFilters(),
+				// The schedule is what sets the clock the date range resolves
+				// against, so the preview lands on the same window as the note
+				// above it, unsaved edits included.
+				active:      isScheduled() ? 1 : 0,
+				schedule:    collectSchedule(),
 			};
 
 			$.post( W.ajax_url, payload )
@@ -432,9 +483,10 @@
 			var $form = $( '<form>', { method: 'post', action: W.admin_post_url } );
 			$form.append( hidden( 'action', 'wooex_download_preview' ) );
 			$form.append( hidden( '_wpnonce', W.nonce_preview_dl ) );
-			$form.append( hidden( 'id', $f.find( 'input[name="id"]' ).val() || '' ) );
 			$form.append( hidden( 'type', $f.find( 'select[name="type"]' ).val() ) );
+			$form.append( hidden( 'active', isScheduled() ? 1 : 0 ) );
 			appendFilterFields( $form, 'filters', collectFilters() );
+			appendFilterFields( $form, 'schedule', collectSchedule() );
 			$form.appendTo( 'body' ).trigger( 'submit' ).remove();
 		} );
 
@@ -505,6 +557,22 @@
 			} );
 		}
 
+		// The schedule sets the moment a report's window is evaluated at, so the
+		// range note, the preview and the save all need it and all need the same
+		// reading of it. One collector rather than three inline copies.
+		function collectSchedule() {
+			return {
+				frequency:    $( '#wooex-field-frequency' ).val(),
+				time:         $( '#wooex-field-time' ).val(),
+				days:         $f.find( 'input[name="days[]"]:checked' ).map( function () { return $( this ).val(); } ).get(),
+				day_of_month: $( '#wooex-field-dom' ).val(),
+			};
+		}
+
+		function isScheduled() {
+			return $f.find( '#wooex-field-active' ).is( ':checked' );
+		}
+
 		function collectFilters() {
 			return {
 				date_range:      $( '#wooex-field-date-range' ).val(),
@@ -541,15 +609,10 @@
 				name:        $f.find( 'input[name="name"]' ).val(),
 				type:        $f.find( 'select[name="type"]' ).val(),
 				format:      $f.find( 'select[name="format"]' ).val(),
-				active:      $f.find( '#wooex-field-active' ).is( ':checked' ) ? 1 : 0,
+				active:      isScheduled() ? 1 : 0,
 				recipients:  $f.find( 'textarea[name="recipients"]' ).val(),
 				filters:     collectFilters(),
-				schedule: {
-					frequency:    $( '#wooex-field-frequency' ).val(),
-					time:         $( '#wooex-field-time' ).val(),
-					days:         $f.find( 'input[name="days[]"]:checked' ).map( function () { return $( this ).val(); } ).get(),
-					day_of_month: $( '#wooex-field-dom' ).val(),
-				},
+				schedule:    collectSchedule(),
 			};
 
 			$.post( W.ajax_url, payload )

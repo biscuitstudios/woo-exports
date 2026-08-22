@@ -29,6 +29,7 @@ class Wooex_Admin {
 		add_action( 'wp_ajax_wooex_get_report',      [ $this, 'ajax_get_report' ] );
 		add_action( 'wp_ajax_wooex_toggle_active',   [ $this, 'ajax_toggle_active' ] );
 		add_action( 'wp_ajax_wooex_review_report',   [ $this, 'ajax_review_report' ] );
+		add_action( 'wp_ajax_wooex_resolve_range',   [ $this, 'ajax_resolve_range' ] );
 		add_action( 'wp_ajax_wooex_search_parent_posts', [ $this, 'ajax_search_parent_posts' ] );
 		add_action( 'wp_ajax_wooex_search_customers',    [ $this, 'ajax_search_customers' ] );
 		add_action( 'wp_ajax_wooex_search_products',     [ $this, 'ajax_search_products' ] );
@@ -118,7 +119,7 @@ class Wooex_Admin {
 					'custom_range_required' => __( 'Custom range requires both From and To dates.', 'woo-exports' ),
 					'custom_range_order'    => __( 'The "To" date must be on or after the "From" date.', 'woo-exports' ),
 					'days_required'         => __( 'Select at least one day of the week.', 'woo-exports' ),
-					'range_note_stale'      => __( 'Save to see the window this resolves to.', 'woo-exports' ),
+					'range_note_error'      => __( 'Could not work out the window for this range.', 'woo-exports' ),
 				],
 			]
 		);
@@ -471,31 +472,75 @@ class Wooex_Admin {
 	}
 
 	/**
-	 * The clock a preview should resolve its date range against.
+	 * The resolved-window note: the sentence printed under Date Range, and the
+	 * window every other surface has to agree with.
 	 *
-	 * With a shifted day boundary the window moves with the time of day: the
-	 * same "Yesterday at 7:00 pm" report previewed at 10am and sent at 9pm
-	 * covers two different periods, a whole day apart. The builder prints the
-	 * window for the NEXT SCHEDULED RUN, so a preview evaluated at "now" would
-	 * contradict the sentence sitting directly above the button.
+	 * With a shifted day boundary the window moves with the time of day. The
+	 * same "Yesterday at 7:00 pm" report resolves to two periods a whole day
+	 * apart depending on whether it is evaluated before or after 7:00 pm. So a
+	 * scheduled report is described AT ITS NEXT RUN, which is the window that
+	 * will actually be emailed, rather than at whatever moment the page is open.
 	 *
-	 * The clock comes from the saved schedule, not from whatever is in the form
-	 * right now. That is deliberate: the note is rendered from the saved report
-	 * too, so the two cannot disagree. Unsaved schedule edits are covered by the
-	 * note going stale on change.
+	 * One function with three callers — the builder view on load, the live
+	 * refresh endpoint, and the preview — so the sentence and the rows behind it
+	 * cannot describe different windows. Them disagreeing was the 0.10.1 bug.
 	 *
-	 * Returns null when the report is unsaved or not scheduled. There "now" is
-	 * the only meaningful answer, and the note says "Currently resolves to".
+	 * The clock comes from the schedule passed in, so the live endpoint can
+	 * answer for unsaved edits to the send time as readily as for saved ones.
+	 *
+	 * @param array $filters  Report filters (date_range, day_start, custom dates).
+	 * @param array $schedule Schedule sub-array, already sanitised.
+	 * @param bool  $active   Whether the report is scheduled at all.
+	 * @return array{intro:string,range:string,at:string,ts:int|null}
 	 */
-	private function preview_reference_ts( string $id ): ?int {
-		if ( '' === $id ) {
-			return null;
+	public static function range_note( array $filters, array $schedule, bool $active ): array {
+		$ts    = null;
+		$at    = '';
+		$intro = 'Currently resolves to';
+
+		if ( $active ) {
+			$next = Wooex_Scheduler::next_run_timestamp( [ 'schedule' => $schedule ] );
+			if ( null !== $next ) {
+				$ts    = $next;
+				$at    = wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next );
+				$intro = sprintf( 'At the next run (%s) this covers', $at );
+			}
 		}
-		$report = Wooex_Report_Store::get( $id );
-		if ( ! $report || empty( $report['active'] ) ) {
-			return null;
-		}
-		return Wooex_Scheduler::next_run_timestamp( $report );
+
+		return [
+			'intro' => $intro,
+			'range' => Wooex_Mailer::format_range_for_filters( $filters, $ts ),
+			'at'    => $at,
+			'ts'    => $ts,
+		];
+	}
+
+	/**
+	 * Live refresh for the resolved-window note.
+	 *
+	 * The note used to be server-rendered once and then marked stale on any
+	 * change, so seeing the effect of picking a different range meant saving and
+	 * reloading. It is still resolved in PHP: working out what "Yesterday at
+	 * 19:00" means involves the site timezone, DST and start_of_week, and a
+	 * JavaScript reimplementation would be a second answer free to drift from
+	 * the one the export actually uses. So the browser asks PHP instead of
+	 * guessing.
+	 */
+	public function ajax_resolve_range(): void {
+		$this->guard();
+
+		$note = self::range_note(
+			$this->sanitize_filters( $_POST['filters'] ?? [] ),
+			$this->sanitize_schedule( $_POST['schedule'] ?? [] ),
+			! empty( $_POST['active'] )
+		);
+
+		wp_send_json_success(
+			[
+				'intro' => $note['intro'],
+				'range' => $note['range'],
+			]
+		);
 	}
 
 	public function ajax_review_report(): void {
@@ -510,9 +555,19 @@ class Wooex_Admin {
 			wp_send_json_error( [ 'message' => 'Attendees report type is unavailable on this site.' ], 400 );
 		}
 
-		$preview_at = $this->preview_reference_ts(
-			sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) )
+		// Sanitised once and reused below. Two calls would be two things to keep
+		// in step, and the note has to describe the same filters the query ran.
+		$filters = $this->sanitize_filters( $_POST['filters'] ?? [] );
+
+		// Same clock the resolved-window note uses, derived from the same posted
+		// schedule, so the preview cannot describe a different window from the
+		// sentence sitting above the button.
+		$preview_note = self::range_note(
+			$filters,
+			$this->sanitize_schedule( $_POST['schedule'] ?? [] ),
+			! empty( $_POST['active'] )
 		);
+		$preview_at   = $preview_note['ts'];
 
 		// Large all-time / this-year queries can churn through tens of thousands
 		// of orders. Without these, PHP hits its default memory/time ceiling and
@@ -558,8 +613,6 @@ class Wooex_Admin {
 		// Buffer any stray notice/warning output that would otherwise corrupt
 		// the JSON response. Discarded right before wp_send_json_success.
 		ob_start();
-
-		$filters = $this->sanitize_filters( $_POST['filters'] ?? [] );
 
 		$preview_limit = 20;
 		$start         = microtime( true );
@@ -615,19 +668,13 @@ class Wooex_Admin {
 		// State the window the preview actually ran over. Without it a
 		// boundary-shifted range is invisible: the rows look plausible and the
 		// only way to notice a mismatch is to read order dates by eye.
-		$range_str = ( 'products' === $type )
-			? ''
-			: Wooex_Mailer::format_range_for_filters( $filters, $preview_at );
-
 		wp_send_json_success(
 			[
 				'rows'     => array_slice( $rows, 0, $preview_limit ),
 				'count'    => $total,
 				'time'     => round( $elapsed, 3 ),
-				'range'    => $range_str,
-				'range_at' => ( null === $preview_at )
-					? ''
-					: wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $preview_at ),
+				'range'    => ( 'products' === $type ) ? '' : $preview_note['range'],
+				'range_at' => $preview_note['at'],
 			]
 		);
 	}
@@ -669,9 +716,11 @@ class Wooex_Admin {
 
 		// Same clock as the on-screen preview, so the downloaded file and the
 		// table it was generated from hold the same rows.
-		$preview_at = $this->preview_reference_ts(
-			sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) )
-		);
+		$preview_at = self::range_note(
+			$filters,
+			$this->sanitize_schedule( $_POST['schedule'] ?? [] ),
+			! empty( $_POST['active'] )
+		)['ts'];
 
 		$report = [
 			'id'      => 'preview-' . wp_generate_password( 8, false, false ),

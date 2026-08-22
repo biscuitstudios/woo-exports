@@ -75,25 +75,12 @@ $show_day_start = in_array( $cur_range, Wooex_Data_Orders::DAY_START_RANGES, tru
 // use, so the boundary can be checked here rather than discovered in tomorrow
 // morning's inbox.
 //
-// For a scheduled report this is evaluated AT THE NEXT RUN, not now. A shifted
-// day boundary means the window moves with the clock: a report viewed at 3pm
-// and run at 9pm covers two different periods, and the one worth showing is the
-// one that will actually be sent.
-$preview_at    = null;
-$preview_intro = 'Currently resolves to';
-
-if ( $is_edit && ! empty( $r['active'] ) ) {
-	$next_run = Wooex_Scheduler::next_run_timestamp( $r );
-	if ( null !== $next_run ) {
-		$preview_at    = $next_run;
-		$preview_intro = sprintf(
-			'At the next run (%s) this covers',
-			wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $next_run )
-		);
-	}
-}
-
-$resolved_range = Wooex_Mailer::format_range_for_filters( $f, $preview_at );
+// Rendered here on load and refreshed over AJAX on every change, both through
+// Wooex_Admin::range_note(), which is also what the preview uses. One function
+// means the sentence and the rows behind it cannot describe different windows.
+$note           = Wooex_Admin::range_note( $f, $s, $is_edit && ! empty( $r['active'] ) );
+$preview_intro  = $note['intro'];
+$resolved_range = $note['range'];
 $cur_frequency = $s['frequency'] ?? 'daily';
 $cur_time      = $s['time']      ?? '06:00';
 $cur_day       = $s['day']       ?? 'monday';

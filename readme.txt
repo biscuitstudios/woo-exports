@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.10.1
+Stable tag: 0.10.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -26,6 +26,14 @@ as-is, with no support. Forks welcome.
 
 == Changelog ==
 
+= 0.10.2 =
+* New: the resolved-window note under Date Range refreshes as you change the
+  range, the day boundary, the custom dates or the schedule. It used to be
+  computed once on page load and then go stale until the next save, so checking
+  what a range meant took a save and a reload. Still resolved in PHP, over a
+  small AJAX call, rather than reimplemented in JavaScript where it could drift
+  from what the export actually does.
+
 = 0.10.1 =
 * Fix: Preview Export now resolves its date range against the next scheduled
   run, the same moment the window printed under Date Range is calculated for.
@@ -39,12 +47,6 @@ as-is, with no support. Forks welcome.
   Tour". Replaced with a search that ranks exact and leading matches first and
   returns up to 100. Drafts and private products are now findable too, since
   reports often run over products a past event sold through.
-* New: the resolved-window note under Date Range refreshes as you change the
-  range, the day boundary, the custom dates or the schedule. It used to be
-  computed once on page load and then go stale until the next save, so checking
-  what a range meant took a save and a reload. Still resolved in PHP, over a
-  small AJAX call, rather than reimplemented in JavaScript where it could drift
-  from what the export actually does.
 * Change: Sunday now leads the Days of Week row in the schedule.
 * Change: toast notifications appear at the top of the screen instead of the
   bottom.

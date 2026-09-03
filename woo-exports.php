@@ -1,9 +1,9 @@
 <?php
 /**
- * Plugin Name:       WooExports
+ * Plugin Name:       Woo Exports
  * Plugin URI:        https://github.com/biscuitstudios/woo-exports
  * Description:       WooCommerce reporting for agency use. Build named export configurations (Products, Orders, Customers, Attendees), schedule emailed exports, and download CSV/XLSX attachments.
- * Version:           0.10.2
+ * Version:           0.11.0
  * Requires at least: 6.3
  * Requires PHP:      8.2
  * Requires Plugins:  woocommerce
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WOOEX_VERSION', '0.10.2' );
+define( 'WOOEX_VERSION', '0.11.0' );
 define( 'WOOEX_FILE', __FILE__ );
 define( 'WOOEX_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WOOEX_URL', plugin_dir_url( __FILE__ ) );
@@ -76,7 +76,7 @@ add_action(
 			add_action(
 				'admin_notices',
 				static function (): void {
-					echo '<div class="notice notice-error"><p><strong>WooExports</strong> requires WooCommerce to be installed and active.</p></div>';
+					echo '<div class="notice notice-error"><p><strong>Woo Exports</strong> requires WooCommerce to be installed and active.</p></div>';
 				}
 			);
 			return;
@@ -89,7 +89,7 @@ add_action(
 			add_action(
 				'admin_notices',
 				static function (): void {
-					echo '<div class="notice notice-error"><p><strong>WooExports:</strong> Action Scheduler is not available. Scheduled exports will not run. Reinstall or update WooCommerce.</p></div>';
+					echo '<div class="notice notice-error"><p><strong>Woo Exports:</strong> Action Scheduler is not available. Scheduled exports will not run. Reinstall or update WooCommerce.</p></div>';
 				}
 			);
 		}

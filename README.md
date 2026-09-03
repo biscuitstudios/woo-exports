@@ -1,4 +1,4 @@
-# WooExports
+# Woo Exports
 
 Scheduled CSV and XLSX exports for WooCommerce.
 

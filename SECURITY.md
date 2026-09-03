@@ -17,5 +17,5 @@ published once a fix is available.
 
 Only the latest release is maintained. There are no long-term support branches.
 
-WooExports is used on live client sites, so genuine reports are taken seriously even
+Woo Exports is used on live client sites, so genuine reports are taken seriously even
 though the plugin carries no formal support commitment.

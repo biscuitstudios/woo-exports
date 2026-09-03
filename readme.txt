@@ -1,10 +1,10 @@
-=== WooExports ===
+=== Woo Exports ===
 Contributors: biscuitstudios
 Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.10.2
+Stable tag: 0.11.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,12 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.11.0 =
+* Change: the plugin is now called "Woo Exports" rather than "WooExports", so it
+  sorts next to the studio's other Woo plugins in the WordPress plugins list and
+  in the admin menu. The folder slug, the text domain and every internal prefix
+  are unchanged, so this is a display change only and updates in place.
 
 = 0.10.2 =
 * New: the resolved-window note under Date Range refreshes as you change the

@@ -81,7 +81,7 @@ class Wooex_Mailer {
 			$rows[] = sprintf( '<p><strong>Date range:</strong> %s</p>', esc_html( $range_str ) );
 		}
 		$rows[] = sprintf( '<p><strong>Rows:</strong> %s</p>', number_format_i18n( $rows_count ) );
-		$rows[] = '<p style="color:#777;font-size:12px;margin-top:24px;">— Sent automatically by WooExports.</p>';
+		$rows[] = '<p style="color:#777;font-size:12px;margin-top:24px;">— Sent automatically by Woo Exports.</p>';
 
 		return implode( "\n", $rows );
 	}

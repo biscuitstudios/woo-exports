@@ -2,7 +2,7 @@
 /**
  * Phase 4 — production admin UI for managing export configurations.
  *
- * Registers the top-level WooExports admin menu, enqueues assets, and exposes
+ * Registers the top-level Woo Exports admin menu, enqueues assets, and exposes
  * AJAX endpoints for create / edit / delete / run-now / toggle-active.
  *
  * @package WooExports
@@ -40,8 +40,8 @@ class Wooex_Admin {
 
 	public function register_menu(): void {
 		$hook = add_menu_page(
-			'WooExports',
-			'WooExports',
+			'Woo Exports',
+			'Woo Exports',
 			'manage_woocommerce',
 			self::MENU_SLUG,
 			[ $this, 'render_page' ],

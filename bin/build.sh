@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Build a clean, deploy-ready zip of WooExports for the WordPress
+# Build a clean, deploy-ready zip of Woo Exports for the WordPress
 # "Upload Plugin" screen. Excludes dev-only files (the internal primer +
 # deploy runbook under docs/, tests, and build tooling) but KEEPS vendor/,
 # which is a committed runtime dependency (PhpSpreadsheet) the XLSX writer

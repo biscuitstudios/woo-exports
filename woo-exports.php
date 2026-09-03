@@ -3,7 +3,7 @@
  * Plugin Name:       Woo Exports
  * Plugin URI:        https://github.com/biscuitstudios/woo-exports
  * Description:       WooCommerce reporting for agency use. Build named export configurations (Products, Orders, Customers, Attendees), schedule emailed exports, and download CSV/XLSX attachments.
- * Version:           0.11.0
+ * Version:           0.12.0
  * Requires at least: 6.3
  * Requires PHP:      8.2
  * Requires Plugins:  woocommerce
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WOOEX_VERSION', '0.11.0' );
+define( 'WOOEX_VERSION', '0.12.0' );
 define( 'WOOEX_FILE', __FILE__ );
 define( 'WOOEX_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WOOEX_URL', plugin_dir_url( __FILE__ ) );
@@ -55,6 +55,11 @@ spl_autoload_register(
 
 register_activation_hook( __FILE__, [ 'Wooex_Activator', 'activate' ] );
 register_deactivation_hook( __FILE__, [ 'Wooex_Activator', 'deactivate' ] );
+
+// Deliberately outside the WooCommerce gate below. A site whose WooCommerce is
+// deactivated still needs to be offered plugin updates, and update checks also
+// run under cron, which is not an admin request.
+( new Wooex_Updater( __FILE__ ) )->init();
 
 add_action(
 	'before_woocommerce_init',

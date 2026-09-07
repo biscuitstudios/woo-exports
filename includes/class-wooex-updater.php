@@ -89,6 +89,7 @@ final class Wooex_Updater {
 			'version'      => $release['version'],
 			'url'          => $release['url'],
 			'package'      => $release['package'],
+			'icons'        => $this->icons(),
 			'requires'     => $plugin_data['RequiresWP'] ?? '',
 			'requires_php' => $plugin_data['RequiresPHP'] ?? '',
 		];
@@ -140,6 +141,7 @@ final class Wooex_Updater {
 		$info->requires      = $data['RequiresWP'];
 		$info->requires_php  = $data['RequiresPHP'];
 		$info->download_link = $release['package'];
+		$info->icons         = $this->icons();
 		$info->last_updated  = $release['published'];
 		$info->sections      = [
 			'description' => wpautop( esc_html( $data['Description'] ) ),
@@ -147,6 +149,31 @@ final class Wooex_Updater {
 		];
 
 		return $info;
+	}
+
+	/**
+	 * Artwork for this plugin, as core's update and install screens expect it.
+	 *
+	 * Nothing supplies this for us. A wordpress.org plugin gets icons from the
+	 * .org API; ours is served from GitHub Releases, so if the updater does not
+	 * hand core an `icons` array the screens fall back to a generic dashicon.
+	 *
+	 * The file ships inside the plugin, so the URL is local and needs no
+	 * network call. Core reads the keys in the order svg, 2x, 1x, default
+	 * (see wp-admin/update-core.php), so `svg` is what actually gets used;
+	 * `default` is there for any consumer that does not look at `svg`. Both
+	 * point at the same file, which is fine because core renders an icon as
+	 * <img src="...">, and an <img> scales an SVG to whatever size it needs.
+	 *
+	 * @return array<string,string>
+	 */
+	private function icons(): array {
+		$url = plugins_url( 'assets/img/icon.svg', $this->file );
+
+		return [
+			'svg'     => $url,
+			'default' => $url,
+		];
 	}
 
 	public function flush_cache(): void {

@@ -66,24 +66,99 @@ class Wooex_Mailer {
 		return array_values( array_unique( $out ) );
 	}
 
+	/**
+	 * Builds the HTML email body.
+	 *
+	 * Visual language follows the Spill notification email: a neutral gray
+	 * page, a single white card with a large bold headline, and quiet gray
+	 * supporting text. Tables and inline styles throughout, because Outlook
+	 * ignores <style> blocks, float and flexbox. Widths are fixed in px for
+	 * the same reason, with max-width for the phone clients that honor it.
+	 */
 	private static function build_body( array $report, string $site_name, string $report_name ): string {
 		$rows_count = (int) Wooex_Exporter::$last_row_count;
 		$range_str  = self::format_range_for_filters( (array) ( $report['filters'] ?? [] ) );
 
-		$rows = [];
-		$rows[] = '<p>Hi,</p>';
-		$rows[] = sprintf(
-			'<p>Your <strong>%s</strong> export from %s is attached.</p>',
-			esc_html( $report_name ),
-			esc_html( $site_name )
-		);
-		if ( $range_str ) {
-			$rows[] = sprintf( '<p><strong>Date range:</strong> %s</p>', esc_html( $range_str ) );
-		}
-		$rows[] = sprintf( '<p><strong>Rows:</strong> %s</p>', number_format_i18n( $rows_count ) );
-		$rows[] = '<p style="color:#777;font-size:12px;margin-top:24px;">— Sent automatically by Woo Exports.</p>';
+		$font = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif";
 
-		return implode( "\n", $rows );
+		// Meta lines under the headline. Date range is omitted for All Time,
+		// which has no range to state.
+		$meta = [];
+		if ( $range_str ) {
+			$meta['Date range'] = $range_str;
+		}
+		// Name what was counted — "Attendees", not "Rows". The type is the
+		// report's own, so the label matches the file that is attached.
+		$count_label          = Wooex_Exporter::type_label( (string) ( $report['type'] ?? '' ) );
+		$meta[ $count_label ] = number_format_i18n( $rows_count );
+
+		$meta_html = '';
+		foreach ( $meta as $label => $value ) {
+			$meta_html .= sprintf(
+				'<tr>
+					<td style="padding:0 0 8px 0;font-family:%1$s;font-size:14px;line-height:20px;color:#8a8a8a;white-space:nowrap;" width="110">%2$s</td>
+					<td style="padding:0 0 8px 0;font-family:%1$s;font-size:14px;line-height:20px;color:#333333;font-weight:600;">%3$s</td>
+				</tr>',
+				$font,
+				esc_html( $label ),
+				esc_html( $value )
+			);
+		}
+
+		return sprintf(
+			'<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>%2$s</title>
+</head>
+<body style="margin:0;padding:0;background-color:#ebebeb;">
+<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ebebeb;">
+	<tr>
+		<td align="center" style="padding:40px 20px;">
+			<table role="presentation" width="560" cellpadding="0" cellspacing="0" border="0" style="width:560px;max-width:100%%;">
+
+				<!-- Wordmark -->
+				<tr>
+					<td style="padding:0 0 28px 0;font-family:%1$s;font-size:26px;line-height:32px;font-weight:800;letter-spacing:-0.5px;color:#111111;">%2$s</td>
+				</tr>
+
+				<!-- Card -->
+				<tr>
+					<td style="background-color:#ffffff;border-radius:14px;padding:40px;">
+						<table role="presentation" width="100%%" cellpadding="0" cellspacing="0" border="0">
+							<tr>
+								<td style="padding:0 0 20px 0;font-family:%1$s;font-size:24px;line-height:32px;font-weight:700;letter-spacing:-0.3px;color:#111111;">Your %3$s export is attached.</td>
+							</tr>
+							<tr>
+								<td style="padding:0 0 24px 0;border-bottom:1px solid #ececec;font-family:%1$s;font-size:15px;line-height:22px;color:#555555;">Generated from %2$s.</td>
+							</tr>
+							<tr>
+								<td style="padding:24px 0 0 0;">
+									<table role="presentation" cellpadding="0" cellspacing="0" border="0">%4$s</table>
+								</td>
+							</tr>
+						</table>
+					</td>
+				</tr>
+
+				<!-- Footer -->
+				<tr>
+					<td style="padding:24px 4px 0 4px;font-family:%1$s;font-size:13px;line-height:19px;color:#8a8a8a;">Sent automatically by Woo Exports.</td>
+				</tr>
+
+			</table>
+		</td>
+	</tr>
+</table>
+</body>
+</html>',
+			$font,
+			esc_html( $site_name ),
+			esc_html( $report_name ),
+			$meta_html
+		);
 	}
 
 	/**

@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.12.0
+Stable tag: 0.13.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,19 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.13.0 =
+* Change: the scheduled export email has been redesigned. It was five plain
+  paragraphs; it is now a single card on a neutral gray background, with the
+  site name above it and the export name as the headline. The opening "Hi," is
+  gone.
+* Change: the email and the Preview Export panel now name what was counted
+  instead of calling everything rows. An attendees export reads "Attendees:
+  1,284" and the preview says "1,284 attendees" rather than "1,284 rows". A
+  report with no recognizable type falls back to "Records".
+* Internal: the list of export types and their labels lived in five places, all
+  of which had to be edited together to add a type. They now read from one
+  constant on the exporter, covered by tests.
 
 = 0.12.0 =
 * New: the plugin now offers its own updates on the Plugins screen. Until now

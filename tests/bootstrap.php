@@ -78,6 +78,7 @@ if ( ! function_exists( 'error_log' ) ) {
 require_once __DIR__ . '/integration/dev-site-check.php';
 
 require_once __DIR__ . '/../includes/class-wooex-scheduler.php';
+require_once __DIR__ . '/../includes/class-wooex-exporter.php';
 require_once __DIR__ . '/../includes/class-wooex-data-products.php';
 require_once __DIR__ . '/../includes/class-wooex-data-attendees.php';
 require_once __DIR__ . '/../includes/class-wooex-data-orders.php';

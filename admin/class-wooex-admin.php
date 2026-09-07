@@ -354,7 +354,7 @@ class Wooex_Admin {
 		$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
 
 		$type = sanitize_key( $_POST['type'] ?? '' );
-		if ( ! in_array( $type, [ 'products', 'orders', 'customers', 'attendees' ], true ) ) {
+		if ( ! in_array( $type, Wooex_Exporter::types(), true ) ) {
 			wp_send_json_error( [ 'message' => 'Invalid export type.' ], 400 );
 		}
 
@@ -547,7 +547,7 @@ class Wooex_Admin {
 		$this->guard();
 
 		$type = sanitize_key( $_POST['type'] ?? '' );
-		if ( ! in_array( $type, [ 'products', 'orders', 'customers', 'attendees' ], true ) ) {
+		if ( ! in_array( $type, Wooex_Exporter::types(), true ) ) {
 			wp_send_json_error( [ 'message' => 'Invalid export type.' ], 400 );
 		}
 
@@ -672,6 +672,10 @@ class Wooex_Admin {
 			[
 				'rows'     => array_slice( $rows, 0, $preview_limit ),
 				'count'    => $total,
+				// What to call the things counted, so the pane says
+				// "512 orders" rather than "512 rows". Pluralized here
+				// because PHP already holds the authoritative total.
+				'label'    => Wooex_Exporter::type_label( $type, 1 !== (int) $total ),
 				'time'     => round( $elapsed, 3 ),
 				'range'    => ( 'products' === $type ) ? '' : $preview_note['range'],
 				'range_at' => $preview_note['at'],
@@ -705,7 +709,7 @@ class Wooex_Admin {
 		set_transient( $throttle_key, 1, 5 );
 
 		$type = sanitize_key( $_POST['type'] ?? '' );
-		if ( ! in_array( $type, [ 'products', 'orders', 'customers', 'attendees' ], true ) ) {
+		if ( ! in_array( $type, Wooex_Exporter::types(), true ) ) {
 			wp_die( 'Invalid export type.' );
 		}
 		if ( 'attendees' === $type && ! Wooex_Data_Attendees::is_available() ) {

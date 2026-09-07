@@ -19,13 +19,6 @@ class Wooex_Reports_List_Table {
 
 	public const BULK_NONCE_ACTION = 'wooex_bulk_reports';
 
-	private const TYPE_LABELS = [
-		'products'  => 'Products',
-		'orders'    => 'Orders',
-		'customers' => 'Customers',
-		'attendees' => 'Attendees',
-	];
-
 	/** @var array<int,array<string,mixed>> */
 	private array $items = [];
 	private int $total = 0;
@@ -213,7 +206,7 @@ class Wooex_Reports_List_Table {
 				<label class="screen-reader-text" for="wooex-type-filter">Filter by type</label>
 				<select name="wooex_type" id="wooex-type-filter">
 					<option value="">All Types</option>
-					<?php foreach ( self::TYPE_LABELS as $val => $label ) : ?>
+					<?php foreach ( Wooex_Exporter::type_options() as $val => $label ) : ?>
 						<option value="<?php echo esc_attr( $val ); ?>" <?php selected( $this->type_filter, $val ); ?>><?php echo esc_html( $label ); ?></option>
 					<?php endforeach; ?>
 				</select>
@@ -334,7 +327,7 @@ class Wooex_Reports_List_Table {
 			<th scope="row" class="wooex-table-cell wooex-col-name is-left-aligned">
 				<?php echo $this->cell_name( $item ); ?>
 			</th>
-			<td class="wooex-table-cell is-left-aligned"><?php echo esc_html( self::TYPE_LABELS[ $item['type'] ?? '' ] ?? (string) ( $item['type'] ?? '' ) ); ?></td>
+			<td class="wooex-table-cell is-left-aligned"><?php echo esc_html( Wooex_Exporter::type_options()[ $item['type'] ?? '' ] ?? (string) ( $item['type'] ?? '' ) ); ?></td>
 			<td class="wooex-table-cell is-left-aligned"><?php echo esc_html( strtoupper( (string) ( $item['format'] ?? '' ) ) ); ?></td>
 			<td class="wooex-table-cell is-left-aligned"><?php echo $this->cell_schedule( $item ); ?></td>
 			<td class="wooex-table-cell is-left-aligned"><?php echo $this->cell_next_run( $item ); ?></td>

@@ -121,13 +121,7 @@ $download_url = ( $is_edit && ! empty( $r['id'] ) ) ? Wooex_Admin::download_url(
 						<label for="wooex-field-type">Export Type <span class="wooex-required">*</span></label>
 						<select name="type" id="wooex-field-type" required>
 							<?php
-							$types = [
-								'products'  => 'Products',
-								'orders'    => 'Orders',
-								'customers' => 'Customers',
-								'attendees' => 'Attendees',
-							];
-							foreach ( $types as $val => $label ) {
+							foreach ( Wooex_Exporter::type_options() as $val => $label ) {
 								$disabled = ( 'attendees' === $val && ! $attendees_ready ) ? 'disabled' : '';
 								$sel      = selected( $cur_type, $val, false );
 								$suffix   = ( 'attendees' === $val && ! $attendees_ready ) ? ' (unavailable)' : '';

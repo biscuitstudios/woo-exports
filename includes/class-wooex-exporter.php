@@ -14,6 +14,56 @@ class Wooex_Exporter {
 	public static int $last_row_count = 0;
 
 	/**
+	 * Human labels for the four export types, singular and plural.
+	 *
+	 * The single source of truth for what export types exist and what they are
+	 * called. Lives here because the exporter is the one class both the
+	 * scheduled (cron) path and the admin path already load. Everything else
+	 * reads it through types(), type_options() or type_label() — the list
+	 * table, the builder's type dropdown and the three request validators in
+	 * `Wooex_Admin` each carried their own copy until September 7, 2026.
+	 *
+	 * Order matters: it is the order the type dropdowns render in.
+	 */
+	public const TYPE_LABELS = [
+		'products'  => [ 'Product', 'Products' ],
+		'orders'    => [ 'Order', 'Orders' ],
+		'customers' => [ 'Customer', 'Customers' ],
+		'attendees' => [ 'Attendee', 'Attendees' ],
+	];
+
+	/**
+	 * Label for an export type. Falls back to "Record"/"Records" for an
+	 * unknown or missing type, so a legacy report row with a blank type still
+	 * produces a readable sentence instead of an empty one.
+	 */
+	public static function type_label( string $type, bool $plural = true ): string {
+		$pair = self::TYPE_LABELS[ $type ] ?? [ 'Record', 'Records' ];
+		return $plural ? $pair[1] : $pair[0];
+	}
+
+	/**
+	 * The valid export type slugs, for validating a request parameter.
+	 *
+	 * @return string[]
+	 */
+	public static function types(): array {
+		return array_keys( self::TYPE_LABELS );
+	}
+
+	/**
+	 * Flat slug => plural label map, for rendering a type <select>.
+	 *
+	 * @return array<string,string>
+	 */
+	public static function type_options(): array {
+		return array_map(
+			static fn( array $pair ): string => $pair[1],
+			self::TYPE_LABELS
+		);
+	}
+
+	/**
 	 * Run a report. Returns the absolute path of the generated file, or false on failure.
 	 * After a successful or failed run, self::$last_row_count holds the row count.
 	 *

@@ -513,7 +513,13 @@
 			var count = data.count || 0;
 			var time  = data.time;
 
-			var html = '<p><strong>' + count + '</strong> row' + ( 1 === count ? '' : 's' );
+			// PHP sends the label already pluralized against the true total
+			// ("Orders", "Attendee"). Lowercased here because it lands
+			// mid-sentence. The fallback covers an older cached script or a
+			// response that predates the field.
+			var label = String( data.label || 'records' ).toLowerCase();
+
+			var html = '<p><strong>' + count + '</strong> ' + escapeHtml( label );
 			if ( 'undefined' !== typeof time ) html += ' in ' + time + 's';
 			html += '.</p>';
 
@@ -546,7 +552,7 @@
 			} );
 			html += '</tbody></table></div>';
 			if ( count > rows.length ) {
-				html += '<p><em>Showing first ' + rows.length + ' of ' + count + ' rows.</em></p>';
+				html += '<p><em>Showing first ' + rows.length + ' of ' + count + ' ' + escapeHtml( label ) + '.</em></p>';
 			}
 			$out.html( html );
 		}

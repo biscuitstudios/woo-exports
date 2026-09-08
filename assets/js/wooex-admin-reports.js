@@ -84,6 +84,174 @@
 		}, 5000 );
 	}
 
+	// Module scope: the builder, the email dialog and the review pane all put
+	// server-supplied text through .html(), and one copy means one place where
+	// the escaping can be wrong.
+	function escapeHtml( s ) {
+		return String( s ).replace( /[&<>"']/g, function ( c ) {
+			return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ c ];
+		} );
+	}
+
+	// =====================================================================
+	// EMAIL EXPORT DIALOG — shared by the list page and the builder
+	// =====================================================================
+
+	// The two surfaces mean different things by "this export", so the dialog
+	// holds no opinion about where the data comes from. Each opener hands it a
+	// `source` and a `payload()` that builds the rest of the request. That is
+	// also what keeps the builder's send on the same window as the preview
+	// above it, without the dialog needing to know a window exists.
+	var emailDialog = null;
+
+	function initEmailDialog() {
+		var $dlg = $( '#wooex-email-dialog' );
+		if ( ! $dlg.length ) {
+			return null;
+		}
+
+		var dlg      = $dlg[0];
+		var $title   = $dlg.find( '.wooex-dialog-title' );
+		var $summary = $dlg.find( '.wooex-dialog-summary' );
+		var $recips  = $dlg.find( '.wooex-dialog-recipients' );
+		var $err     = $dlg.find( '.wooex-dialog-error' );
+		var $send    = $dlg.find( '.wooex-dialog-send' );
+
+		var current    = null;
+		var openToken  = 0;   // guards a late prefill landing in a later dialog
+		var prefilled  = '';  // what open() put in the field, to detect typing
+
+		function showError( msg ) {
+			$err.html( '<p>' + escapeHtml( msg ) + '</p>' ).show();
+		}
+
+		function close() {
+			current = null;
+			if ( dlg.close ) {
+				dlg.close();
+			} else {
+				dlg.removeAttribute( 'open' );
+			}
+			$dlg.removeClass( 'is-fallback-open' );
+		}
+
+		function open( opts ) {
+			current   = opts;
+			openToken = openToken + 1;
+
+			var initial = opts.recipients || W.current_user_email || '';
+			prefilled   = initial;
+
+			$title.text( opts.title || 'Email Export' );
+			$summary.text( opts.summary || '' ).toggle( !! opts.summary );
+			$recips.val( initial );
+			$err.hide().empty();
+			$send.prop( 'disabled', false ).text( 'Send Export' );
+
+			// showModal gives the backdrop, focus trap and Esc handling. The
+			// fallback is for a browser without it and only has to be usable.
+			if ( dlg.showModal ) {
+				dlg.showModal();
+			} else {
+				dlg.setAttribute( 'open', '' );
+				$dlg.addClass( 'is-fallback-open' );
+			}
+
+			$recips.trigger( 'focus' );
+			return openToken;
+		}
+
+		// Late-arriving saved recipients. Only replaces the field when nothing
+		// has been typed into it, and only for the dialog that asked.
+		function prefill( token, value ) {
+			if ( token !== openToken || ! current ) { return; }
+			if ( $recips.val() !== prefilled ) { return; }
+			prefilled = value;
+			$recips.val( value );
+		}
+
+		$dlg.on( 'click', '.wooex-dialog-cancel', close );
+
+		// Native Esc fires `cancel`; clear state so a reopen starts clean.
+		$dlg.on( 'cancel', function () {
+			current = null;
+		} );
+
+		// Click on the backdrop. The dialog element's own box is the card, so a
+		// click whose target IS the dialog landed outside it.
+		$dlg.on( 'click', function ( e ) {
+			if ( e.target === dlg ) { close(); }
+		} );
+
+		$dlg.on( 'click', '.wooex-dialog-send', function () {
+			if ( ! current ) { return; }
+
+			$err.hide().empty();
+
+			var raw = ( $recips.val() || '' ).trim();
+			if ( ! raw ) {
+				showError( W.i18n.send_recipients_required );
+				return;
+			}
+
+			var emails  = raw.split( /[\s,;]+/ ).filter( Boolean );
+			var emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+			for ( var i = 0; i < emails.length; i++ ) {
+				if ( ! emailRe.test( emails[ i ] ) ) {
+					showError( W.i18n.invalid_email );
+					return;
+				}
+			}
+
+			var max = parseInt( W.max_recipients, 10 ) || 10;
+			if ( emails.length > max ) {
+				showError( String( W.i18n.send_too_many ).replace( '%d', max ) );
+				return;
+			}
+
+			var payload = $.extend(
+				{
+					action:      'wooex_send_export',
+					_ajax_nonce: W.nonce,
+					source:      current.source,
+					recipients:  raw,
+				},
+				current.payload ? current.payload() : {}
+			);
+
+			$send.prop( 'disabled', true ).text( W.i18n.sending );
+
+			$.post( W.ajax_url, payload )
+				.done( function ( res ) {
+					if ( res && res.success ) {
+						// Close first: the toast area is a normal fixed element,
+						// so it would render behind the modal's backdrop.
+						close();
+						flash( 'success', ( res.data && res.data.message ) || 'Export emailed.' );
+						return;
+					}
+					showError( ( res && res.data && res.data.message ) || 'Send failed.' );
+				} )
+				.fail( function ( xhr ) {
+					var msg = 'Network error.';
+					var parsed = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+					if ( parsed && parsed.data && parsed.data.message ) {
+						msg = parsed.data.message;
+					} else if ( xhr && 0 === xhr.status ) {
+						msg = 'Request timed out. Try a narrower date range.';
+					} else if ( xhr && xhr.status >= 500 ) {
+						msg = 'Server error — check the PHP error log for [WooExports] entries.';
+					}
+					showError( msg );
+				} )
+				.always( function () {
+					$send.prop( 'disabled', false ).text( 'Send Export' );
+				} );
+		} );
+
+		return { open: open, prefill: prefill, close: close };
+	}
+
 	// =====================================================================
 	// LIST PAGE
 	// =====================================================================
@@ -134,6 +302,39 @@
 			$( '.wooex-rowmenu-toggle' ).attr( 'aria-expanded', 'false' );
 			$( '.wooex-rowmenu' ).attr( 'aria-expanded', 'false' );
 		}
+
+		// Email Export (row action). Generates the saved report against the
+		// clock right now — the same window Download and Run Now produce.
+		$( document ).on( 'click', '.wooex-email-export-action', function ( e ) {
+			e.preventDefault();
+			if ( ! emailDialog ) { return; }
+
+			var $a  = $( this );
+			var id  = String( $a.data( 'report-id' ) || '' );
+			var name = String( $a.data( 'report-name' ) || '' );
+
+			var token = emailDialog.open( {
+				source:  'saved',
+				title:   'Email Export',
+				summary: name
+					? '\u201C' + name + '\u201D will be generated from live data now and emailed as an attachment.'
+					: 'This export will be generated from live data now and emailed as an attachment.',
+				payload: function () { return { id: id }; },
+			} );
+
+			// Prefill with the report's own recipients, fetched rather than
+			// printed into every row's markup — the list would otherwise carry
+			// every client's address in the page source.
+			$.post( W.ajax_url, {
+				action:      'wooex_get_report',
+				_ajax_nonce: W.nonce,
+				id:          id,
+			} ).done( function ( res ) {
+				if ( res && res.success && res.data && res.data.recipients_text ) {
+					emailDialog.prefill( token, res.data.recipients_text );
+				}
+			} );
+		} );
 
 		// Run Now (row hover action) — synchronous run + flash, then reload.
 		$( document ).on( 'click', '.wooex-run-now-action', function ( e ) {
@@ -410,6 +611,13 @@
 
 		var $previewDl = $f.find( '.wooex-preview-download-btn' );
 
+		// The last preview that is still valid for what is on the form. The
+		// Email Export dialog repeats it, so you are not sending a count you
+		// have not seen. Null means no preview, or one the form has since
+		// invalidated — either way the dialog says the count is unknown rather
+		// than quoting a stale one.
+		var lastPreview = null;
+
 		$f.on( 'click', '.wooex-review-btn', function () {
 			var $btn = $( this );
 			var $out = $f.find( '.wooex-review-results' );
@@ -434,16 +642,22 @@
 			$.post( W.ajax_url, payload )
 				.done( function ( res ) {
 					if ( ! res || ! res.success ) {
+						lastPreview = null;
 						var errMsg = res && res.data && res.data.message ? res.data.message : 'Preview failed.';
 						$out.html( '<div class="notice notice-error inline"><p>' + escapeHtml( errMsg ) + '</p></div>' );
 						return;
 					}
+					lastPreview = {
+						count: res.data.count || 0,
+						label: res.data.label || 'records',
+					};
 					renderReviewResults( $out, res.data );
 					if ( ( res.data.count || 0 ) > 0 ) {
 						$previewDl.show();
 					}
 				} )
 				.fail( function ( xhr ) {
+					lastPreview = null;
 					var msg = 'Network error.';
 					// Try to pull a useful message out of the response body —
 					// the shutdown handler returns JSON for fatals, but if PHP
@@ -473,8 +687,78 @@
 
 		// Re-edit invalidates the previewed data — force a fresh preview before
 		// the user can download.
-		$f.on( 'change input', 'select[name="type"], [data-filter] :input, [data-filter-pair] :input', function () {
-			$previewDl.hide();
+		//
+		// The schedule fields are in here as well as the filters, because for a
+		// scheduled report the window is resolved at the next run: changing the
+		// send time moves the window without touching a single filter. The
+		// Download button could go stale that way too, and quietly did.
+		$f.on(
+			'change input',
+			'select[name="type"], [data-filter] :input, [data-filter-pair] :input, '
+				+ '#wooex-field-frequency, #wooex-field-time, #wooex-field-dom, '
+				+ '#wooex-field-active, input[name="days[]"]',
+			function () {
+				$previewDl.hide();
+				lastPreview = null;
+			}
+		);
+
+		// Email Export (builder). Sends the export as configured on this page,
+		// saved or not, resolved against the same moment the preview uses. So
+		// the file that arrives holds the rows the preview showed.
+		$f.on( 'click', '.wooex-email-export-btn', function () {
+			if ( ! emailDialog ) { return; }
+
+			$err.hide().empty();
+
+			// The one filter mistake that changes what leaves the building: an
+			// incomplete Custom range resolves to every order the site has ever
+			// taken. Refused here and again server-side.
+			if ( 'custom' === $( '#wooex-field-date-range' ).val() ) {
+				var df = $f.find( 'input[name="date_from"]' ).val();
+				var dt = $f.find( 'input[name="date_to"]' ).val();
+				if ( ! df || ! dt ) { showError( W.i18n.custom_range_required ); return; }
+				if ( dt < df ) { showError( W.i18n.custom_range_order ); return; }
+			}
+
+			// Repeat the resolved window in the dialog. It is the sentence the
+			// page already computed in PHP, so there is no second answer here.
+			var $note   = $f.find( '.wooex-range-note' );
+			var summary = 'The export as configured on this page will be generated and emailed as an attachment.';
+			if ( $note.length && $note.is( ':visible' ) ) {
+				summary += ' ' + $note.text().replace( /\s+/g, ' ' ).trim();
+			}
+
+			// Say what the last preview counted, so the dialog is the
+			// look-before-you-send step rather than the button being hidden
+			// behind one. A zero count is the point of the feature, so it is
+			// reported like any other number.
+			if ( lastPreview ) {
+				summary += ' The last preview of this window found '
+					+ lastPreview.count + ' '
+					+ String( lastPreview.label ).toLowerCase() + '.';
+			} else {
+				summary += ' No preview has been run for these settings yet.';
+			}
+
+			emailDialog.open( {
+				source:  'builder',
+				title:   'Email Export',
+				summary: summary,
+				// Saved recipients are right here on the form, so there is
+				// nothing to fetch. Falls back to your own address.
+				recipients: ( $f.find( 'textarea[name="recipients"]' ).val() || '' ).trim(),
+				payload: function () {
+					return {
+						name:     $f.find( 'input[name="name"]' ).val(),
+						type:     $f.find( 'select[name="type"]' ).val(),
+						format:   $f.find( 'select[name="format"]' ).val(),
+						active:   isScheduled() ? 1 : 0,
+						filters:  collectFilters(),
+						schedule: collectSchedule(),
+					};
+				},
+			} );
 		} );
 
 		// Download the preview as XLSX via a one-shot POST to admin-post.php.
@@ -555,12 +839,6 @@
 				html += '<p><em>Showing first ' + rows.length + ' of ' + count + ' ' + escapeHtml( label ) + '.</em></p>';
 			}
 			$out.html( html );
-		}
-
-		function escapeHtml( s ) {
-			return String( s ).replace( /[&<>"']/g, function ( c ) {
-				return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ c ];
-			} );
 		}
 
 		// The schedule sets the moment a report's window is evaluated at, so the
@@ -679,6 +957,9 @@
 		$( '.wooex-notice-area .notice-success' ).each( function () {
 			autoDismiss( $( this ) );
 		} );
+
+		// Before the page initialisers — both of their openers reach for it.
+		emailDialog = initEmailDialog();
 
 		if ( $( '.wooex-reports-list' ).length ) {
 			initListPage();

@@ -261,6 +261,7 @@ $download_url = ( $is_edit && ! empty( $r['id'] ) ) ? Wooex_Admin::download_url(
 				<div class="wooex-review-area">
 					<button type="button" class="button wooex-review-btn">Preview Export</button>
 					<button type="button" class="button wooex-preview-download-btn" style="display:none;">Download</button>
+					<button type="button" class="button wooex-email-export-btn" data-source="builder">Email Export</button>
 					<div class="wooex-review-results" style="display:none;"></div>
 				</div>
 
@@ -328,4 +329,6 @@ $download_url = ( $is_edit && ! empty( $r['id'] ) ) ? Wooex_Admin::download_url(
 
 		<div class="wooex-form-error notice notice-error inline" style="display:none;"></div>
 	</form>
+
+	<?php include WOOEX_DIR . 'admin/views/partial-email-dialog.php'; ?>
 </div>

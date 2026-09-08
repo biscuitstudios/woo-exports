@@ -3,7 +3,7 @@
  * Plugin Name:       Woo Exports
  * Plugin URI:        https://github.com/biscuitstudios/woo-exports
  * Description:       WooCommerce reporting for agency use. Build named export configurations (Products, Orders, Customers, Attendees), schedule emailed exports, and download CSV/XLSX attachments.
- * Version:           0.14.0
+ * Version:           0.15.0
  * Requires at least: 6.3
  * Requires PHP:      8.2
  * Requires Plugins:  woocommerce
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define( 'WOOEX_VERSION', '0.14.0' );
+define( 'WOOEX_VERSION', '0.15.0' );
 define( 'WOOEX_FILE', __FILE__ );
 define( 'WOOEX_DIR', plugin_dir_path( __FILE__ ) );
 define( 'WOOEX_URL', plugin_dir_url( __FILE__ ) );

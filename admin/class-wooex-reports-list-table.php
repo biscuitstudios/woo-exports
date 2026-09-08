@@ -448,6 +448,13 @@ class Wooex_Reports_List_Table {
 			$items = [
 				sprintf( '<li><a role="menuitem" href="%s">Edit</a></li>', esc_url( Wooex_Admin::builder_url( 'edit', $id ) ) ),
 				sprintf( '<li><a role="menuitem" href="%s">Download</a></li>', esc_url( Wooex_Admin::download_url( $id ) ) ),
+				// Offered whether or not the report is scheduled. An unscheduled
+				// report is exactly the one you send by hand.
+				sprintf(
+					'<li><a role="menuitem" href="#" class="wooex-email-export-action" data-report-id="%s" data-report-name="%s">Email Export</a></li>',
+					esc_attr( $id ),
+					esc_attr( (string) ( $item['name'] ?? '' ) )
+				),
 			];
 			if ( ! empty( $item['active'] ) ) {
 				$items[] = sprintf( '<li><a role="menuitem" href="#" class="wooex-run-now-action" data-report-id="%s">Run Now</a></li>', esc_attr( $id ) );

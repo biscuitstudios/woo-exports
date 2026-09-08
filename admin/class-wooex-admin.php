@@ -17,6 +17,17 @@ class Wooex_Admin {
 	public const MENU_SLUG = 'wooex-reports';
 	private const NONCE    = 'wooex_ajax';
 
+	/**
+	 * Ceiling on addresses a single manual send will accept.
+	 *
+	 * The scheduled path has no cap because its recipient list is saved
+	 * deliberately and reviewed on the way in. A typed-at-the-time list is a
+	 * different thing: it is one paste away from turning the admin screen into
+	 * a bulk mailer that attaches customer PII. Ten covers a client, their
+	 * finance person and the studio.
+	 */
+	private const MAX_SEND_RECIPIENTS = 10;
+
 	public function init(): void {
 		add_action( 'admin_menu', [ $this, 'register_menu' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
@@ -26,6 +37,7 @@ class Wooex_Admin {
 		add_action( 'wp_ajax_wooex_save_report',     [ $this, 'ajax_save_report' ] );
 		add_action( 'wp_ajax_wooex_delete_report',   [ $this, 'ajax_delete_report' ] );
 		add_action( 'wp_ajax_wooex_run_now',         [ $this, 'ajax_run_now' ] );
+		add_action( 'wp_ajax_wooex_send_export',     [ $this, 'ajax_send_export' ] );
 		add_action( 'wp_ajax_wooex_get_report',      [ $this, 'ajax_get_report' ] );
 		add_action( 'wp_ajax_wooex_toggle_active',   [ $this, 'ajax_toggle_active' ] );
 		add_action( 'wp_ajax_wooex_review_report',   [ $this, 'ajax_review_report' ] );
@@ -105,6 +117,11 @@ class Wooex_Admin {
 				'nonce'            => wp_create_nonce( self::NONCE ),
 				'nonce_war'        => wp_create_nonce( 'wooex_search' ),
 				'nonce_preview_dl' => wp_create_nonce( 'wooex_download_preview' ),
+				// Fallback prefill for the email dialog when there is nothing
+				// saved to prefill from. Sending to yourself first is the
+				// common case, so the field is never empty on open.
+				'current_user_email' => wp_get_current_user()->user_email,
+				'max_recipients'     => self::MAX_SEND_RECIPIENTS,
 				// Which ranges honour day_start. Passed from PHP rather than
 				// restated here, so the field's visibility cannot disagree with
 				// what the resolver actually does.
@@ -120,6 +137,9 @@ class Wooex_Admin {
 					'custom_range_order'    => __( 'The "To" date must be on or after the "From" date.', 'woo-exports' ),
 					'days_required'         => __( 'Select at least one day of the week.', 'woo-exports' ),
 					'range_note_error'      => __( 'Could not work out the window for this range.', 'woo-exports' ),
+					'sending'               => __( 'Sending…', 'woo-exports' ),
+					'send_recipients_required' => __( 'Enter at least one email address.', 'woo-exports' ),
+					'send_too_many'         => __( 'Too many addresses. The limit is %d.', 'woo-exports' ),
 				],
 			]
 		);
@@ -452,6 +472,181 @@ class Wooex_Admin {
 			[
 				'status'  => $fresh['last_run_status'] ?? 'unknown',
 				'message' => $fresh['last_run_message'] ?? '',
+			]
+		);
+	}
+
+	/**
+	 * Manual send — generate an export now and email it to typed addresses.
+	 *
+	 * Two sources feed this, because the button sits in two places and each one
+	 * means something different by "this export":
+	 *
+	 * - `saved` (row menu on the list): the stored report, resolved against the
+	 *   clock right now. Same window Download and Run Now produce, which is
+	 *   what "pull the latest report" has to mean from a list row.
+	 * - `builder` (button beside Preview Export): whatever is on the form,
+	 *   saved or not, resolved against the same moment the preview above it
+	 *   used. So the file that arrives holds the rows that were on screen.
+	 *
+	 * Deliberately does NOT write last_run / last_run_status. Those describe the
+	 * schedule, and a person pressing a button is not the schedule running. A
+	 * manual send that overwrote them would make a healthy report look like it
+	 * had run when it had not, and hide a missed overnight run behind a
+	 * lunchtime test.
+	 *
+	 * A zero-row export still sends. That is the point of the feature: the email
+	 * is the evidence that a window had no orders in it.
+	 */
+	public function ajax_send_export(): void {
+		$this->guard();
+
+		// Validate before the throttle, so a typo does not cost a cooldown.
+		$recipients = $this->sanitize_recipients( $_POST['recipients'] ?? '' );
+		if ( empty( $recipients ) ) {
+			wp_send_json_error( [ 'message' => 'Enter at least one valid email address.' ], 400 );
+		}
+		if ( count( $recipients ) > self::MAX_SEND_RECIPIENTS ) {
+			wp_send_json_error(
+				[
+					'message' => sprintf(
+						'Too many addresses — the limit is %d.',
+						self::MAX_SEND_RECIPIENTS
+					),
+				],
+				400
+			);
+		}
+
+		// One send per 10 seconds per user. A send is a file build plus an
+		// outbound email, so a stuck browser tab rage-clicking this could both
+		// exhaust the worker pool and spam a client's inbox.
+		$throttle_key = 'wooex_send_' . get_current_user_id();
+		if ( get_transient( $throttle_key ) ) {
+			wp_send_json_error(
+				[ 'message' => 'Please wait a few seconds before sending another export.' ],
+				429
+			);
+		}
+
+		$source = sanitize_key( wp_unslash( $_POST['source'] ?? 'saved' ) );
+		$now    = null;
+
+		if ( 'builder' === $source ) {
+			$type = sanitize_key( $_POST['type'] ?? '' );
+			if ( ! in_array( $type, Wooex_Exporter::types(), true ) ) {
+				wp_send_json_error( [ 'message' => 'Invalid export type.' ], 400 );
+			}
+			if ( 'attendees' === $type && ! Wooex_Data_Attendees::is_available() ) {
+				wp_send_json_error( [ 'message' => 'Attendees export type is unavailable on this site.' ], 400 );
+			}
+
+			$format = sanitize_key( $_POST['format'] ?? 'xlsx' );
+			if ( ! in_array( $format, [ 'xlsx', 'csv' ], true ) ) {
+				$format = 'xlsx';
+			}
+
+			$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+			if ( mb_strlen( $name ) > 60 ) {
+				$name = mb_substr( $name, 0, 60 );
+			}
+
+			$filters = $this->sanitize_filters( $_POST['filters'] ?? [] );
+
+			// A Custom range missing either date resolves to an empty window,
+			// which Wooex_Data_Orders::resolve_dates() treats exactly like All
+			// Time — every order the site has ever taken. Harmless on a preview
+			// you download yourself. Not harmless on a file that leaves the
+			// building, so this one refuses rather than guessing.
+			if ( 'custom' === ( $filters['date_range'] ?? '' )
+				&& ( '' === $filters['date_from'] || '' === $filters['date_to'] ) ) {
+				wp_send_json_error(
+					[ 'message' => 'A custom range needs both a From and a To date.' ],
+					400
+				);
+			}
+
+			// Same clock as the preview sitting directly above the button.
+			$now = self::range_note(
+				$filters,
+				$this->sanitize_schedule( $_POST['schedule'] ?? [] ),
+				! empty( $_POST['active'] )
+			)['ts'];
+
+			$report = [
+				// Prefixed so a file left behind by a failed send is
+				// identifiable in the export directory.
+				'id'      => 'send-' . wp_generate_password( 8, false, false ),
+				'name'    => $name,
+				'type'    => $type,
+				'format'  => $format,
+				'filters' => $filters,
+			];
+		} else {
+			$id = sanitize_text_field( wp_unslash( $_POST['id'] ?? '' ) );
+			if ( ! $id ) {
+				wp_send_json_error( [ 'message' => 'Missing export ID.' ], 400 );
+			}
+
+			$report = Wooex_Report_Store::get( $id );
+			if ( ! $report ) {
+				wp_send_json_error( [ 'message' => 'Export not found.' ], 404 );
+			}
+			if ( ! empty( $report['trashed_at'] ) ) {
+				wp_send_json_error( [ 'message' => 'This export is in the trash. Restore it first.' ], 400 );
+			}
+		}
+
+		set_transient( $throttle_key, 1, 10 );
+
+		// Same ceilings the preview raises. A send builds a real file, so an
+		// All Time export can hold the worker for a long time.
+		if ( function_exists( 'wp_raise_memory_limit' ) ) {
+			wp_raise_memory_limit( 'admin' );
+		}
+		@set_time_limit( 120 );
+
+		$file = Wooex_Exporter::run( $report, $now );
+		if ( false === $file || ! file_exists( $file ) ) {
+			wp_send_json_error(
+				[ 'message' => 'Export failed — see the PHP error log for [WooExports] entries.' ],
+				500
+			);
+		}
+
+		$rows = (int) Wooex_Exporter::$last_row_count;
+		$sent = Wooex_Mailer::send( $report, $file, $recipients, true );
+
+		// An admin-triggered outbound carrying customer PII is worth a record.
+		// Counts only — the addresses are in the mail server's log, and this
+		// file is not the place to accumulate them.
+		error_log(
+			sprintf(
+				'[WooExports] Manual send (%s) report %s: %s, %d row(s), %d recipient(s).',
+				$source,
+				(string) ( $report['id'] ?? '?' ),
+				$sent ? 'sent' : 'FAILED',
+				$rows,
+				count( $recipients )
+			)
+		);
+
+		if ( ! $sent ) {
+			wp_send_json_error(
+				[ 'message' => 'The export was generated but the email failed to send. Check the site\'s email configuration.' ],
+				500
+			);
+		}
+
+		wp_send_json_success(
+			[
+				'message' => sprintf(
+					'%s %s emailed to %d recipient%s.',
+					number_format_i18n( $rows ),
+					strtolower( Wooex_Exporter::type_label( (string) ( $report['type'] ?? '' ), 1 !== $rows ) ),
+					count( $recipients ),
+					1 === count( $recipients ) ? '' : 's'
+				),
 			]
 		);
 	}

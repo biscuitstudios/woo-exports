@@ -68,6 +68,25 @@ if ( ! function_exists( 'is_email' ) ) {
 	}
 }
 
+// Records the call instead of sending, so the send path can be asserted
+// without an MTA. $GLOBALS['_wooex_test_mail'] holds every call in order;
+// $GLOBALS['_wooex_test_mail_result'] forces the return value.
+if ( ! function_exists( 'wp_mail' ) ) {
+	function wp_mail( $to, $subject, $message, $headers = '', $attachments = [] ) {
+		if ( ! isset( $GLOBALS['_wooex_test_mail'] ) || ! is_array( $GLOBALS['_wooex_test_mail'] ) ) {
+			$GLOBALS['_wooex_test_mail'] = [];
+		}
+		$GLOBALS['_wooex_test_mail'][] = [
+			'to'          => $to,
+			'subject'     => $subject,
+			'message'     => $message,
+			'headers'     => $headers,
+			'attachments' => $attachments,
+		];
+		return $GLOBALS['_wooex_test_mail_result'] ?? true;
+	}
+}
+
 if ( ! function_exists( 'error_log' ) ) {
 	// PHP's real error_log is available; this is just defensive.
 	function error_log( string $msg ): bool { return true; }

@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.14.0
+Stable tag: 0.15.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,61 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.15.0 =
+* New: Email Export. A row action on the Exports list and a button beside
+  Preview Export in the builder both open a dialog where you type the addresses
+  and send. The list row generates the saved export from live data; the builder
+  button sends the export as configured on the page, saved or not, over the same
+  window the preview shows. Neither changes the export's saved recipients, and
+  neither touches Last Run, which still describes the schedule.
+* Note: a manual send goes out even when the window holds no orders. That is
+  deliberate. The email is how you show a client that a date range was empty.
+* Change: the export email is responsive. It was a fixed 560px table that
+  wrapped in three places on a long site name and had no phone layout at all.
+  The card is now fluid up to 680px, the meta rows stack label above value
+  below 620px, and the padding and type scale come down below 480px. Outlook
+  desktop is pinned to the full width by a conditional table, since it neither
+  reflows nor honours max-width.
+* Fix: a date range now breaks at the dash between the two dates rather than in
+  the middle of one, on every width.
+* New: the email follows the reader's light or dark system preference. It had
+  no dark handling at all, so a client was free to invert half the design on its
+  own. There is now a real dark palette rather than an inversion: the card sits
+  above the ground by the same step it does in light mode.
+* Fix: the quiet grey used for the meta labels and the footer was #8a8a8a,
+  which is 3.45:1 on the card and fails WCAG AA. It is now #767676 at 4.54:1.
+* Change: the footer line sits inside the card, under a divider matching the one
+  above the date range, rather than on the page background below it. #767676
+  only reaches 3.81:1 on that background, so the two changes go together. Every
+  piece of text in the email now clears AA in both schemes, with no exceptions.
+* Change: every table and cell in the email names its own background colour.
+  A client that repaints table and td wholesale reaches through any element that
+  does not, which cost the card's rounded corners and, before that, most of the
+  card.
+* Internal: every colour is stated once per scheme, in two palettes, and
+  substituted into the inline styles and the dark-mode block from there. The
+  tests measure the contrast of both palettes and assert that every colour set
+  inline has a dark counterpart, since a role missed in dark mode keeps its
+  light value and nobody on a light machine ever sees it.
+* Note: a client that rewrites colour values outright rather than through CSS
+  will still do its own thing. The Gmail app is the one to check.
+* Change: on the edit screen, the Download button and the preview count are now
+  invalidated by a change to the schedule as well as to the filters. For a
+  scheduled export the window is resolved at the next run, so moving the send
+  time moves the window without touching a filter. Download could go stale that
+  way and quietly did.
+* Change: the Email Export dialog on the edit screen repeats what the last
+  preview counted, or says no preview has been run. The button is deliberately
+  not hidden behind a preview the way Download is: Download only appears when a
+  preview found rows, and a zero-row send is the case this feature exists for.
+* Fix: an export named "Nightly Order Export" produced the headline "Your
+  Nightly Order Export export is attached." The appended word is dropped when
+  the name already ends in export or report.
+* Internal: a manual send refuses a Custom range missing either date. An
+  incomplete custom range resolves to every order the site has ever taken,
+  which is survivable on a preview you download yourself and not on a file
+  that leaves the building.
 
 = 0.14.0 =
 * New: the plugin now has its own icon on the Plugins and Updates screens.

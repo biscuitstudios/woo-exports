@@ -860,3 +860,85 @@
 .wooex-review-table-wrap tbody tr:last-child td {
 	border-bottom: 0;
 }
+
+/* ============================================================
+   Email Export dialog
+
+   A native <dialog>, so the backdrop, focus trap and Esc handling
+   are the browser's rather than ours. Padding sits on the inner
+   wrapper, not on the element, so a click landing on the element
+   itself is unambiguously a backdrop click.
+
+   The form tokens (--wooex-input-height) come from the .wrap the
+   partial is included in. A dialog in the top layer still inherits
+   down the DOM tree, so nothing needs restating here.
+   ============================================================ */
+
+.wooex-dialog {
+	width: 480px;
+	max-width: calc(100vw - 32px);
+	padding: 0;
+	border: 0;
+	border-radius: 4px;
+	background: #fff;
+	color: #3c434a;
+	font-size: 13px;
+	line-height: 1.4;
+	box-shadow:
+		0 0 0 1px rgba(0, 0, 0, 0.1),
+		0 12px 32px rgba(0, 0, 0, 0.18);
+}
+.wooex-dialog::backdrop {
+	background: rgba(0, 0, 0, 0.45);
+}
+.wooex-dialog:not([open]) {
+	display: none;
+}
+
+/* Fallback for a browser without showModal(): the element is shown with the
+   `open` attribute, which gives no backdrop and no centering of its own. */
+.wooex-dialog.is-fallback-open {
+	position: fixed;
+	top: 50%;
+	left: 50%;
+	transform: translate(-50%, -50%);
+	z-index: 100060;
+}
+
+.wooex-dialog-inner {
+	padding: 24px;
+}
+.wooex-dialog-title {
+	margin: 0 0 12px;
+	padding: 0;
+	font-size: 18px;
+	line-height: 1.3;
+	font-weight: 600;
+	color: #1e1e1e;
+}
+.wooex-dialog-summary {
+	margin: 0 0 20px;
+	color: #50575e;
+	font-size: 13px;
+	line-height: 1.6;
+}
+.wooex-dialog .wooex-field {
+	margin-bottom: 0;
+}
+.wooex-dialog .wooex-dialog-error {
+	margin: 16px 0 0;
+}
+.wooex-dialog-actions {
+	display: flex;
+	justify-content: flex-end;
+	gap: 8px;
+	margin-top: 24px;
+	padding-top: 20px;
+	border-top: 1px solid #e2e4e7;
+}
+
+/* The builder's Email Export button sits third in the row, after Preview
+   Export and the Download that appears beside it. */
+.wooex-review-area .wooex-email-export-btn {
+	margin-left: 6px;
+}

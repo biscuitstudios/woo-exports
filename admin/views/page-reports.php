@@ -27,4 +27,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 	</div>
 
 	<?php $table->render(); ?>
+
+	<?php include WOOEX_DIR . 'admin/views/partial-email-dialog.php'; ?>
 </div>

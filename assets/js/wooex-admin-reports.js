@@ -7,6 +7,21 @@
 
 	var W = window.wooexAdmin;
 
+	/**
+	 * The version of THIS file.
+	 *
+	 * Kept in step with WOOEX_VERSION by tests/AssetVersionTest.php, not by
+	 * memory. Its purpose is the comparison in the boot block: PHP localizes
+	 * the version it thinks it is serving, and if a browser, page cache or CDN
+	 * hands back an older copy of this script, the mismatch says so instead of
+	 * the page quietly doing nothing.
+	 *
+	 * A stale copy of this file cannot report on itself, so this only helps
+	 * from the release after it lands. That is still every release after this
+	 * one.
+	 */
+	var SCRIPT_VERSION = '0.15.1';
+
 	// Filter sections each report type should show.
 	var FILTERS_PER_TYPE = {
 		products:  [ 'cats', 'tags' ],
@@ -103,6 +118,26 @@
 	// also what keeps the builder's send on the same window as the preview
 	// above it, without the dialog needing to know a window exists.
 	var emailDialog = null;
+
+	/**
+	 * Both Email Export openers went through a bare early return, which is the
+	 * shape of a report that names a hazard and does not guard it: the click did
+	 * nothing, no error, nothing in the console, and no way to tell that from a
+	 * handler that never bound. Say what happened instead.
+	 */
+	function emailDialogReady() {
+		if ( emailDialog ) {
+			return true;
+		}
+		var msg = 'The Email Export dialog is missing from this page. '
+			+ 'Reload with a hard refresh, and clear the site and CDN cache if it persists.';
+		flash( 'error', msg );
+		if ( window.console && window.console.error ) {
+			window.console.error( '[WooExports] ' + msg
+				+ ' (#wooex-email-dialog was not found in the DOM.)' );
+		}
+		return false;
+	}
 
 	function initEmailDialog() {
 		var $dlg = $( '#wooex-email-dialog' );
@@ -307,7 +342,7 @@
 		// clock right now — the same window Download and Run Now produce.
 		$( document ).on( 'click', '.wooex-email-export-action', function ( e ) {
 			e.preventDefault();
-			if ( ! emailDialog ) { return; }
+			if ( ! emailDialogReady() ) { return; }
 
 			var $a  = $( this );
 			var id  = String( $a.data( 'report-id' ) || '' );
@@ -707,7 +742,7 @@
 		// saved or not, resolved against the same moment the preview uses. So
 		// the file that arrives holds the rows the preview showed.
 		$f.on( 'click', '.wooex-email-export-btn', function () {
-			if ( ! emailDialog ) { return; }
+			if ( ! emailDialogReady() ) { return; }
 
 			$err.hide().empty();
 
@@ -959,6 +994,19 @@
 		} );
 
 		// Before the page initialisers — both of their openers reach for it.
+		// A stale script is the one failure that looks identical to a feature
+		// that was never built: no error, no handler, nothing happens. PHP says
+		// which version it is serving, so a mismatch is detectable and worth
+		// saying out loud rather than leaving someone to guess.
+		if ( W.version && W.version !== SCRIPT_VERSION ) {
+			flash(
+				'error',
+				'Woo Exports: this page is running a cached copy of the admin script ('
+					+ SCRIPT_VERSION + ') while the plugin is ' + W.version
+					+ '. Hard-reload the page, and clear the site and CDN cache if it persists.'
+			);
+		}
+
 		emailDialog = initEmailDialog();
 
 		if ( $( '.wooex-reports-list' ).length ) {

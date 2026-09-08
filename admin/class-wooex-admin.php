@@ -117,6 +117,11 @@ class Wooex_Admin {
 				'nonce'            => wp_create_nonce( self::NONCE ),
 				'nonce_war'        => wp_create_nonce( 'wooex_search' ),
 				'nonce_preview_dl' => wp_create_nonce( 'wooex_download_preview' ),
+				// What PHP thinks it is serving. The script carries its own
+				// copy and compares, so a browser or CDN handing back an older
+				// wooex-admin-reports.js announces itself instead of silently
+				// binding no handlers.
+				'version'          => WOOEX_VERSION,
 				// Fallback prefill for the email dialog when there is nothing
 				// saved to prefill from. Sending to yourself first is the
 				// common case, so the field is never empty on open.

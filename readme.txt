@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.15.0
+Stable tag: 0.15.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,20 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.15.1 =
+* Fix: Email Export did nothing on a site whose theme strips the ?ver= query
+  string from asset URLs. Both openers returned silently when the dialog was
+  not on the page, so a click produced no dialog, no error, and nothing in the
+  console. They now say what happened.
+* New: the admin script carries its own version and compares it against the
+  version PHP reports. A browser or CDN serving a cached copy of an older
+  script now says so in a notice instead of quietly binding no handlers. A test
+  keeps the two numbers in step, so a release cannot ship them out of step.
+* Note: the cause on the site this was found on was not in this plugin. Its
+  theme removed ?ver= from every asset URL, so the URL never changed between
+  releases and the CDN served the previous version's JavaScript for a year.
+  This release cannot fix that. From here on it reports it.
 
 = 0.15.0 =
 * New: Email Export. A row action on the Exports list and a button beside

@@ -859,6 +859,12 @@ class Wooex_Admin {
 		}
 
 		$rows = (array) $rows;
+
+		// The same empty-cell fill the file gets. Applied here too because the
+		// preview is the promise the export has to keep: a pane showing blanks
+		// against a file showing dashes is a bug report waiting to happen.
+		$rows = Wooex_Exporter::with_blank_placeholder( $rows );
+
 		// Orders set $total via get_paginated; everything else still loads the
 		// full set so the count matches the row array.
 		if ( 'orders' !== $type ) {

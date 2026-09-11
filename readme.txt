@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.15.1
+Stable tag: 0.16.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,34 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.16.0 =
+* Fix: removing a status from Order Statuses and saving now sticks. The default
+  pair, Completed and Processing, was being merged back into the saved list slot
+  by slot, so any export filtered to a single status silently kept a second one
+  and put it back in the builder on reload. Reports saved before this release
+  keep whatever is stored now; re-save to correct one.
+* Fix: an Attendees export gave every ticket in a multi-ticket order the
+  purchaser's name and email. The name and email Event Tickets Plus stamps on an
+  attendee come from the WooCommerce billing details, not from the attendee, so
+  a family of three exported the buyer three times. The export now reads the
+  Attendee Information the ticket actually collected, and falls back to the
+  purchaser only where no such field was ever asked for.
+* Change: an Attendee Information field that exists but was left blank now
+  exports blank, where before it borrowed the purchaser's details. Optional
+  fields are the normal case, and an empty cell is the true answer.
+* New: Purchaser Name and Purchaser Email columns on the Attendees export, after
+  Security Code. On a multi-ticket order the attendee columns are somebody other
+  than the buyer, so these are the reference for who paid. They read the order's
+  billing details rather than the copy Event Tickets Plus stamps on the ticket,
+  which goes stale if billing is corrected later.
+* New: empty cells export an en dash instead of nothing, on all four export
+  types and in the Preview pane. A blank cell reads to a client as missing data.
+  A zero is still a zero: 0, 0.00 and the cover-fee columns are untouched.
+* New: `wooex_attendee_name_slugs` and `wooex_attendee_email_slugs` filters, for
+  a site whose fieldset uses field names the plugin does not recognise.
+* Note: attendee names and emails change on this release wherever Attendee
+  Information was collected. The new values are the correct ones.
 
 = 0.15.1 =
 * Fix: Email Export did nothing on a site whose theme strips the ?ver= query

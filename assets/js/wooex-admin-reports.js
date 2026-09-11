@@ -20,7 +20,7 @@
 	 * from the release after it lands. That is still every release after this
 	 * one.
 	 */
-	var SCRIPT_VERSION = '0.15.1';
+	var SCRIPT_VERSION = '0.16.0';
 
 	// Filter sections each report type should show.
 	var FILTERS_PER_TYPE = {

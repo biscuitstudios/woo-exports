@@ -129,18 +129,68 @@ class Wooex_Exporter {
 	}
 
 	private static function query_rows( string $type, array $filters, ?int $now = null ): ?array {
+		$rows = null;
+
 		switch ( $type ) {
 			// Products carry no date filter, so there is no clock to pass.
 			case 'products':
-				return Wooex_Data_Products::get( $filters );
+				$rows = Wooex_Data_Products::get( $filters );
+				break;
 			case 'orders':
-				return Wooex_Data_Orders::get( $filters, $now );
+				$rows = Wooex_Data_Orders::get( $filters, $now );
+				break;
 			case 'customers':
-				return Wooex_Data_Customers::get( $filters, $now );
+				$rows = Wooex_Data_Customers::get( $filters, $now );
+				break;
 			case 'attendees':
-				return Wooex_Data_Attendees::is_available() ? Wooex_Data_Attendees::get( $filters, $now ) : [];
+				$rows = Wooex_Data_Attendees::is_available() ? Wooex_Data_Attendees::get( $filters, $now ) : [];
+				break;
 		}
-		return null;
+
+		return null === $rows ? null : self::with_blank_placeholder( $rows );
+	}
+
+	/**
+	 * What an empty cell is filled with, so a client reads "no value" rather than
+	 * "something went missing".
+	 *
+	 * An EN dash, not a hyphen, for a reason: `safe_cell()` quote-prefixes any
+	 * cell opening with `-` as CSV-injection defence, so a plain hyphen would
+	 * reach the client as `'-`. The en dash sidesteps that guard instead of
+	 * weakening it, and the CSV writer emits a UTF-8 BOM so Excel renders it.
+	 */
+	public const BLANK_PLACEHOLDER = "\u{2013}";
+
+	/**
+	 * Fills every empty cell with BLANK_PLACEHOLDER. Applied to all four export
+	 * types, at the two points rows are read: here for the file, and again for
+	 * the Preview pane, so the preview shows what the file will hold.
+	 *
+	 * Empty means the trimmed string is empty. A zero is a value and is left
+	 * alone: `0`, `'0'` and `'0.00'` all survive, which matters because the
+	 * cover-fee columns distinguish a real zero from a non-participating order.
+	 *
+	 * Note for anything summing a column: a blank coerces to 0 in arithmetic
+	 * where text raises #VALUE!, so `=D2*2` on a placeholder cell now errors.
+	 * SUM() and AVERAGE() ignore text and blanks alike and are unaffected, which
+	 * is the behaviour the cover-fee columns were designed around.
+	 */
+	public static function with_blank_placeholder( array $rows ): array {
+		foreach ( $rows as $i => $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			foreach ( $row as $key => $value ) {
+				if ( is_array( $value ) || is_object( $value ) ) {
+					continue;
+				}
+				if ( '' === trim( (string) $value ) ) {
+					$rows[ $i ][ $key ] = self::BLANK_PLACEHOLDER;
+				}
+			}
+		}
+
+		return $rows;
 	}
 
 	private static function write_csv( array $rows, string $path ): bool {

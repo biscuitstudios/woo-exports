@@ -102,3 +102,4 @@ require_once __DIR__ . '/../includes/class-wooex-data-products.php';
 require_once __DIR__ . '/../includes/class-wooex-data-attendees.php';
 require_once __DIR__ . '/../includes/class-wooex-data-orders.php';
 require_once __DIR__ . '/../includes/class-wooex-mailer.php';
+require_once __DIR__ . '/../includes/class-wooex-report-store.php';

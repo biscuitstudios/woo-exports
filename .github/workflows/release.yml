@@ -75,8 +75,39 @@ jobs:
       - name: Build the plugin zip
         run: bash bin/build.sh "$RUNNER_TEMP"
 
+      # The release body is what the "View version X details" modal shows on
+      # every client site, so it comes from the changelog written by hand in
+      # readme.txt. GitHub's own notes are generated from merged pull requests,
+      # and this repo commits straight to main, so on every release so far they
+      # amounted to a compare link and nothing else.
+      #
+      # generate_release_notes stays on below. The API pre-pends a supplied body
+      # to the generated notes rather than replacing them, so the changelog
+      # leads and the Full Changelog link still lands underneath it.
+      - name: Build the release notes from readme.txt
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          NOTES="$RUNNER_TEMP/release-notes.md"
+          awk -v want="= $TAG =" '
+            { line = $0; sub( /[[:space:]]+$/, "", line ) }
+            line == want      { copy = 1; next }
+            line ~ /^= [0-9]/ { copy = 0 }
+            copy              { print }
+          ' readme.txt > "$NOTES"
+          # A version bump can land without its changelog entry, and nothing
+          # else would catch it. The release would publish and the modal would
+          # read as blank on every site.
+          if ! grep -q '[^[:space:]]' "$NOTES"; then
+            echo "readme.txt has no '= $TAG =' changelog section, or it is empty." >&2
+            echo "Write the entry before tagging. That section becomes the release body, and the release body is the changelog every site reads." >&2
+            exit 1
+          fi
+          echo "Release notes for $TAG:"
+          cat "$NOTES"
+
       - name: Publish the release
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ runner.temp }}/*.zip
+          body_path: ${{ runner.temp }}/release-notes.md
           generate_release_notes: true

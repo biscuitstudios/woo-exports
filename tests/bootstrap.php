@@ -103,3 +103,19 @@ require_once __DIR__ . '/../includes/class-wooex-data-attendees.php';
 require_once __DIR__ . '/../includes/class-wooex-data-orders.php';
 require_once __DIR__ . '/../includes/class-wooex-mailer.php';
 require_once __DIR__ . '/../includes/class-wooex-report-store.php';
+
+// Close enough to the real esc_url() for the changelog renderer: it rejects a
+// scheme it does not recognise and encodes ampersands. It is NOT a
+// reimplementation, so a passing suite says nothing about the real function's
+// stricter handling.
+if ( ! function_exists( 'esc_url' ) ) {
+	function esc_url( $url ) {
+		$url = trim( (string) $url );
+		return preg_match( '#^https?://#', $url ) ? str_replace( '&', '&#038;', $url ) : '';
+	}
+}
+if ( ! function_exists( 'esc_html__' ) ) {
+	function esc_html__( $text, $domain = '' ) { return esc_html( $text ); }
+}
+
+require_once __DIR__ . '/../includes/class-wooex-updater.php';

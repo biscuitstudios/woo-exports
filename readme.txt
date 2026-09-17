@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.17.0
+Stable tag: 0.18.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,20 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.18.0 =
+* New: the changelog in the "View version X details" modal now lists every
+  recent release, newest first, each under its version number and release date.
+  It showed only the version being offered before, with no date on it.
+* New: versions released before the changelog moved into the release notes are
+  filled in from the copy of readme.txt inside the installed plugin, so the list
+  reads as a real history rather than a column of blanks. Nothing extra is
+  fetched to do it.
+* Change: the update check now reads the releases list rather than the single
+  latest release. It is still one request, so the number of calls made against
+  GitHub is unchanged, and drafts and prereleases are skipped exactly as before.
+* Note: the list stops at ten releases and says so, with a link to the rest on
+  GitHub.
 
 = 0.17.0 =
 * New: the "View version X details" modal now shows the changelog for the

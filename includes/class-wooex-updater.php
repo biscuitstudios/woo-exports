@@ -235,6 +235,10 @@ final class Wooex_Updater {
 			'https://api.github.com/repos/' . self::REPO . '/releases?per_page=' . ( self::MAX_RELEASES + 1 ),
 			[
 				'timeout' => 10,
+				// Explicit rather than inherited. WordPress defaults this to true, but an
+				// http_request_args filter on a client site could flip it and nothing here
+				// would notice.
+				'sslverify' => true,
 				'headers' => [
 					'Accept'     => 'application/vnd.github+json',
 					'User-Agent' => 'WordPress/' . get_bloginfo( 'version' ) . '; ' . home_url( '/' ),
@@ -349,6 +353,18 @@ final class Wooex_Updater {
 			$url  = (string) ( $asset['browser_download_url'] ?? '' );
 
 			if ( '' === $url || ! str_ends_with( strtolower( $name ), '.zip' ) ) {
+				continue;
+			}
+
+			// The download URL becomes code the WordPress upgrader installs on every
+			// site, so it is pinned to this plugin's own repo rather than trusted
+			// because GitHub handed it over. GitHub only ever returns repo-hosted
+			// asset URLs today, so this is defense in depth rather than a fix for a
+			// reachable bug: it takes "what if the response is not what we think"
+			// off the one path where a wrong assumption is arbitrary code.
+			// Suggested fixes.md item 14, applied to all six copies together on
+			// September 22, 2026 so they do not drift apart.
+			if ( ! str_starts_with( $url, 'https://github.com/' . self::REPO . '/' ) ) {
 				continue;
 			}
 

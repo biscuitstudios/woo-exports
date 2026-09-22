@@ -4,7 +4,7 @@ Tags: woocommerce, export, csv, xlsx, reports
 Requires at least: 6.3
 Tested up to: 7.0
 Requires PHP: 8.2
-Stable tag: 0.18.0
+Stable tag: 0.18.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -25,6 +25,18 @@ as-is, with no support. Forks welcome.
 3. Activate.
 
 == Changelog ==
+
+= 0.18.1 =
+* Security hardening: the updater now pins its download URL to this plugin's
+  own GitHub repository. find_zip_asset() used to hand the WordPress upgrader
+  whatever browser_download_url the GitHub API returned, and that URL becomes
+  code the upgrader installs. Not a reachable bug, because GitHub only ever
+  returns repo-hosted asset URLs, but it is the one path where a wrong
+  assumption about a response would be arbitrary code. The fallback branch is
+  pinned too, because it was a second way in.
+* sslverify is now explicit on the GitHub API call. WordPress defaults it to
+  true, so nothing changes today, but a filter on a site could flip it and
+  nothing here would notice.
 
 = 0.18.0 =
 * New: the changelog in the "View version X details" modal now lists every
